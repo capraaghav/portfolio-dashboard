@@ -1,0 +1,15 @@
+# Personal data — never share or commit (holdings, snapshots, watchlist, prices)
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit secrets (if ever added)
+.streamlit/secrets.toml
