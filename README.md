@@ -59,12 +59,14 @@ Turn the heavier ones off for a faster load; turn them on when you want that ana
 
 Auto-detected: **Zerodha Kite**, **Zerodha Console** (incl. the detailed Excel
 with Sector + Long-Term columns), **HDFC Securities**, **Reliance Securities**,
-**Groww**, **Upstox**, **Angel One**. Any other broker works too as long as the
-file has a Symbol/ISIN + Quantity + Price column — names are fuzzy-matched, the
-header row and sheet are auto-detected even under metadata rows, and
-`UPPER_SNAKE_CASE` columns (`NSE_SYMBOL`, `COST_PRICE`, `ISIN_CODE`) are handled.
-Each uploaded file = one account; a stock held in multiple accounts is
-consolidated into one row with a per-account breakdown.
+**IndusInd**, **IIFL Portfolio+ (PDF report)**, **Groww**, **Upstox**,
+**Angel One**. Files can be **CSV, Excel, or PDF** — any broker works as long as it
+has a Symbol/ISIN + Quantity + Price column. Names are fuzzy-matched, the header
+row and sheet are auto-detected even under metadata rows, `UPPER_SNAKE_CASE`
+columns (`NSE_SYMBOL`, `COST_PRICE`, `ISIN_CODE`) are handled, and **PDF
+statements** (text-based, e.g. IIFL Portfolio+) are scraped page-by-page. Each
+uploaded file = one account; a stock held in multiple accounts is consolidated
+into one row with a per-account breakdown.
 
 **Files that use a full company name or only an ISIN instead of a ticker** are
 automatically resolved to the right NSE/BSE symbol via Yahoo search:

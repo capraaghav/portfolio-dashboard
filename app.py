@@ -104,7 +104,7 @@ with st.sidebar:
 
     st.subheader("Upload Holdings")
     st.caption("CSV or Excel exports from any broker. Each file = one account.")
-    uploaded = st.file_uploader("Drop files here", type=["csv", "xlsx", "xls"],
+    uploaded = st.file_uploader("Drop files here", type=["csv", "xlsx", "xls", "pdf"],
                                 accept_multiple_files=True, label_visibility="collapsed",
                                 key="uploader")
 
@@ -153,14 +153,16 @@ with st.sidebar:
 | **Zerodha Kite** | Holdings → ⋮ → Download |
 | **Zerodha Console** | Portfolio → Holdings → Export |
 | **HDFC Securities** | Portfolio → Holdings → Download |
-| **Reliance Securities** | Holdings → Download |
+| **Reliance / IndusInd** | Holdings → Download |
+| **IIFL Portfolio+ (PDF)** | Portfolio report PDF |
 | **Groww** | Stocks → ↓ Download Report |
 | **Upstox** | Holdings → Export |
 | **Angel One** | Holdings → Download |
-| **Any broker** | CSV/Excel with Symbol/ISIN + Quantity + Price |
+| **Any broker** | CSV / Excel / **PDF** with Symbol/ISIN + Qty + Price |
 
 Files that store a full **company name** or only an **ISIN** instead of a ticker
-are auto-matched to NSE/BSE symbols (the file's own LTP disambiguates look-alikes).
+are auto-matched to NSE/BSE symbols (the file's own LTP disambiguates look-alikes;
+unknown names fall back to the NSE official list, then a web search).
         """)
     if MULTIUSER:
         st.caption("🔒 Your upload is processed in a private session and is **not stored** after you "

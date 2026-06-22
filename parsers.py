@@ -254,11 +254,79 @@ def find_csv_header_row(lines: list[str]) -> int:
     return best_idx
 
 
+# ─── PDF statements (e.g. IIFL Portfolio+) ───────────────────────────────────
+
+_PDF_TICKER_RE = re.compile(r"^[A-Z][A-Z0-9&.\-]{0,18}$")
+
+
+def _pdf_num(tok: str):
+    """Parse one PDF numeric token: Indian commas (1,09,912.73), parenthesised
+    negatives ((-7,400.64)), trailing %, and '--' blanks."""
+    t = tok.replace(",", "").replace("%", "").strip()
+    neg = t.startswith("(")
+    t = t.strip("()")
+    if t in ("--", "-", "", "nan", "na"):
+        return None
+    try:
+        v = float(t)
+        return -abs(v) if neg else v
+    except ValueError:
+        return None
+
+
+def _parse_pdf_line(line: str) -> dict | None:
+    """Pull one holding from a PDF text line 'SCRIP qty buyprice invested ltp curval …'.
+    Sector headings, column headers and footers are skipped — they aren't an
+    ALL-CAPS ticker followed by numbers."""
+    parts = line.split()
+    if len(parts) < 6:
+        return None
+    name = parts[0].upper()
+    if not _PDF_TICKER_RE.match(name):
+        return None
+    nums = [_pdf_num(t) for t in parts[1:]]
+    if sum(1 for x in nums if x is not None) < 5:
+        return None
+    # Positional columns: Qty, Purchase Price, Invested Value, Current Price, Current Value
+    if nums[0] is None or nums[1] is None or nums[4] is None:
+        return None
+    if not (nums[0] > 0 and nums[1] > 0):
+        return None
+    return {"ticker": name, "shares": nums[0], "avg_cost": nums[1],
+            "ltp": nums[3], "current_value": nums[4]}
+
+
+def parse_pdf(raw_bytes: bytes) -> pd.DataFrame:
+    """Extract holdings from a portfolio-statement PDF (e.g. IIFL Portfolio+ report).
+    Reads every page's text and keeps lines shaped like 'TICKER qty price …'."""
+    try:
+        import pdfplumber
+    except ImportError:
+        raise ValueError("PDF support needs the 'pdfplumber' package — run: pip install pdfplumber")
+
+    rows = []
+    with pdfplumber.open(io.BytesIO(raw_bytes)) as pdf:
+        for page in pdf.pages:
+            for line in (page.extract_text() or "").split("\n"):
+                row = _parse_pdf_line(line)
+                if row:
+                    rows.append(row)
+    if not rows:
+        raise ValueError(
+            "Couldn't find a holdings table in this PDF — it may be scanned (image-only) "
+            "or use an unusual layout. Try a CSV/Excel export instead."
+        )
+    return pd.DataFrame(rows)
+
+
 def parse_uploaded_file(f, account_name: str) -> pd.DataFrame:
     """Parse one uploaded file-like object into the normalised schema."""
     name = f.name.lower()
+    is_pdf = name.endswith(".pdf")
 
-    if name.endswith((".xlsx", ".xls")):
+    if is_pdf:
+        df = parse_pdf(f.read())                       # already normalised schema
+    elif name.endswith((".xlsx", ".xls")):
         raw_bytes = f.read()
         sheet, header_row = find_excel_header(raw_bytes)
         df = pd.read_excel(io.BytesIO(raw_bytes), sheet_name=sheet, skiprows=header_row)
@@ -274,9 +342,10 @@ def parse_uploaded_file(f, account_name: str) -> pd.DataFrame:
     df = df.dropna(how="all")
     df.columns = [str(c).strip() for c in df.columns]
 
-    broker = detect_broker(df)
-    if broker != "generic":
-        df = df.rename(columns=BROKER_FORMATS[broker]["map"])
+    if is_pdf:
+        pass                                           # parse_pdf already normalised columns
+    elif detect_broker(df) != "generic":
+        df = df.rename(columns=BROKER_FORMATS[detect_broker(df)]["map"])
     else:
         df = normalize_generic(df)
 
