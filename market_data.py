@@ -14,8 +14,10 @@ the cache key. We use that to pass the resolved-suffix map without breaking cach
 
 from __future__ import annotations
 import difflib
+import io
 import re
 import time
+from collections import Counter
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -136,17 +138,105 @@ def _resolve_one_name(query: str, csv_ltp: float | None = None) -> str | None:
     return top_sym.rsplit(".", 1)[0] if top_score >= 0.62 else None
 
 
+_ISIN_PAT = re.compile(r"^IN[A-Z][0-9A-Z]{9}$")
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_nse_master() -> dict:
+    """NSE's official equity list — the authoritative web source for Indian tickers
+    (more current than Yahoo; e.g. it knows Adani Wilmar is now 'AWL'). Returns
+    {'isin': {isin: symbol}, 'names': [(norm_name, symbol)], 'symbols': set}."""
+    try:
+        r = _yahoo_session().get(
+            "https://archives.nseindia.com/content/equities/EQUITY_L.csv", timeout=20)
+        df = pd.read_csv(io.StringIO(r.text))
+        df.columns = [c.strip() for c in df.columns]
+        sym = df["SYMBOL"].astype(str).str.strip()
+        return {
+            "isin": dict(zip(df["ISIN NUMBER"].astype(str).str.strip(), sym)),
+            "names": [(_norm_name(n), s) for n, s in zip(df["NAME OF COMPANY"], sym)],
+            "symbols": set(sym),
+        }
+    except Exception:
+        return {"isin": {}, "names": [], "symbols": set()}
+
+
+def _match_nse_master(query: str, master: dict) -> str | None:
+    """Resolve against the official NSE list: exact ISIN, else fuzzy company name."""
+    if not master.get("names"):
+        return None
+    qup = query.strip().upper()
+    if _ISIN_PAT.match(qup):
+        return master["isin"].get(qup)
+    nq = _norm_name(query)
+    if not nq:
+        return None
+    best_sym, best_score = None, 0.0
+    for norm, sym in master["names"]:
+        sc = difflib.SequenceMatcher(None, nq, norm).ratio()
+        if sc > best_score:
+            best_score, best_sym = sc, sym
+    return best_sym if best_score >= 0.78 else None
+
+
+def _web_resolve(name: str, csv_ltp: float | None, master: dict) -> str | None:
+    """Last resort — consult the broader web (DuckDuckGo) for renamed companies Yahoo
+    no longer maps (e.g. 'Adani Wilmar' -> AWL). Only accepts a symbol whose live price
+    matches the CSV price, so it never guesses a popular ticker for an obscure holding.
+    Requires a real CSV price; suspended/₹0 holdings stay unresolved on purpose."""
+    if not master.get("symbols") or not csv_ltp or csv_ltp <= 0:
+        return None
+    try:
+        r = _yahoo_session().get("https://html.duckduckgo.com/html/",
+                                 params={"q": f"{name} NSE stock symbol share price"}, timeout=15)
+    except Exception:
+        return None
+    tokens = re.findall(r"\b([A-Z][A-Z0-9&\-]{2,12})\b", r.text.upper())
+    counts = Counter(t for t in tokens if t in master["symbols"] and t not in ("NSE", "BSE"))
+    if not counts:
+        return None
+    best = None  # (symbol, price_proximity) — keep the closest price match
+    for sym, _freq in counts.most_common(8):
+        for suf in SUFFIXES:
+            try:
+                px = yf.Ticker(sym + suf).fast_info.last_price
+            except Exception:
+                px = None
+            if px:
+                prox = abs(px / csv_ltp - 1)
+                if prox <= 0.06 and (best is None or prox < best[1]):
+                    best = (sym, prox)
+                break
+    return best[0] if best else None
+
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def resolve_symbols(names: tuple, _query_map: dict, _ltp_map: dict) -> dict:
-    """{original_name: bare_ticker_or_None}. Cached 24h — resolution is stable."""
+    """{original_name: bare_ticker_or_None}. Cached 24h. Resolution chain:
+    1) Yahoo Finance search (with CSV-price disambiguation),
+    2) NSE official symbol master (authoritative for ISINs + name misses),
+    3) broader web search (DuckDuckGo) validated against the NSE list + price."""
     out: dict[str, str | None] = {}
     if not names:
         return out
+    master = fetch_nse_master()
 
     def one(n):
-        return n, _resolve_one_name(_query_map.get(n, n), _ltp_map.get(n))
+        q = _query_map.get(n, n)
+        ltp = _ltp_map.get(n)
+        qup = str(q).strip().upper()
+        # ISIN: the NSE list is authoritative; fall back to Yahoo if absent
+        if _ISIN_PAT.match(qup):
+            return n, (master["isin"].get(qup) or _resolve_one_name(q, ltp))
+        sym = _resolve_one_name(q, ltp)               # 1) Yahoo
+        if sym:
+            return n, sym
+        sym = _match_nse_master(q, master)            # 2) NSE official list
+        if sym:
+            return n, sym
+        return n, _web_resolve(q, ltp, master)        # 3) broader web
 
-    with ThreadPoolExecutor(max_workers=min(12, len(names))) as ex:
+    with ThreadPoolExecutor(max_workers=min(10, len(names))) as ex:
         for n, sym in ex.map(one, names):
             out[n] = sym
     return out
