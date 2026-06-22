@@ -38,50 +38,63 @@ REC_COLOR = {
 
 # ─── Number formatting (Indian lakh/crore conventions) ───────────────────────
 
+def _num(val):
+    """Coerce to a finite float, else None. Tolerates strings, NaN, inf, and the
+    odd non-numeric value Yahoo Finance occasionally returns (e.g. a string P/E)."""
+    if val is None or isinstance(val, bool):
+        return None
+    if isinstance(val, str):
+        s = val.replace(",", "").replace("%", "").replace("₹", "").strip()
+        try:
+            val = float(s)
+        except ValueError:
+            return None
+    try:
+        f = float(val)
+    except (ValueError, TypeError):
+        return None
+    return None if (np.isnan(f) or np.isinf(f)) else f
+
+
 def _is_missing(val) -> bool:
-    if val is None:
-        return True
-    if isinstance(val, float) and np.isnan(val):
-        return True
-    return False
+    return _num(val) is None
 
 
 def fmt_inr(val, short=False) -> str:
-    if _is_missing(val):
+    v = _num(val)
+    if v is None:
         return "—"
     if short:
-        if abs(val) >= 1e7:
-            return f"₹{val/1e7:.2f} Cr"
-        if abs(val) >= 1e5:
-            return f"₹{val/1e5:.2f} L"
-        if abs(val) >= 1e3:
-            return f"₹{val/1e3:.1f} K"
-    return f"₹{val:,.2f}"
+        if abs(v) >= 1e7:
+            return f"₹{v/1e7:.2f} Cr"
+        if abs(v) >= 1e5:
+            return f"₹{v/1e5:.2f} L"
+        if abs(v) >= 1e3:
+            return f"₹{v/1e3:.1f} K"
+    return f"₹{v:,.2f}"
 
 
 def fmt_pct(val) -> str:
-    if _is_missing(val):
-        return "—"
-    return f"{val:+.2f}%"
+    v = _num(val)
+    return "—" if v is None else f"{v:+.2f}%"
 
 
 def fmt_num(val, decimals=2) -> str:
-    if _is_missing(val):
-        return "—"
-    return f"{val:,.{decimals}f}"
+    v = _num(val)
+    return "—" if v is None else f"{v:,.{decimals}f}"
 
 
 def fmt_int(val) -> str:
-    if _is_missing(val):
-        return "—"
-    return f"{int(val):,}"
+    v = _num(val)
+    return "—" if v is None else f"{int(v):,}"
 
 
 def fmt_mcap(val) -> str:
     """Market cap in Indian crore."""
-    if _is_missing(val) or val == 0:
+    v = _num(val)
+    if v is None or v == 0:
         return "—"
-    cr = val / 1e7
+    cr = v / 1e7
     if cr >= 1e5:
         return f"₹{cr/1e5:.2f} L Cr"
     return f"₹{cr:,.0f} Cr"

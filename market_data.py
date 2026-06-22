@@ -339,30 +339,37 @@ def _fetch_meta_one(ticker: str, suffix: str) -> tuple:
         time.sleep(0.4 * (attempt + 1))  # back off on rate limits
     if not info:
         return ticker, "Unknown", ticker, {}, {}
+    def _f(x):  # numeric fields → finite float or None (Yahoo sometimes sends strings)
+        try:
+            v = float(x)
+        except (TypeError, ValueError):
+            return None
+        return None if (v != v or v in (float("inf"), float("-inf"))) else v
+
     try:
         sector = info.get("sector") or "Unknown"
         name = info.get("longName") or info.get("shortName") or ticker
         analyst = {
-            "target_low":    info.get("targetLowPrice"),
-            "target_high":   info.get("targetHighPrice"),
-            "target_mean":   info.get("targetMeanPrice"),
-            "target_median": info.get("targetMedianPrice"),
-            "n_analysts":    info.get("numberOfAnalystOpinions"),
+            "target_low":    _f(info.get("targetLowPrice")),
+            "target_high":   _f(info.get("targetHighPrice")),
+            "target_mean":   _f(info.get("targetMeanPrice")),
+            "target_median": _f(info.get("targetMedianPrice")),
+            "n_analysts":    _f(info.get("numberOfAnalystOpinions")),
             "rec_key":       info.get("recommendationKey"),
-            "rec_mean":      info.get("recommendationMean"),
+            "rec_mean":      _f(info.get("recommendationMean")),
         }
         fundamentals = {
-            "pe":          info.get("trailingPE"),
-            "forward_pe":  info.get("forwardPE"),
-            "pb":          info.get("priceToBook"),
-            "market_cap":  info.get("marketCap"),
-            "beta":        info.get("beta"),
-            "roe":         info.get("returnOnEquity"),
-            "profit_margin": info.get("profitMargins"),
-            "debt_to_equity": info.get("debtToEquity"),
-            "div_yield":   info.get("dividendYield"),
-            "wk52_high":   info.get("fiftyTwoWeekHigh"),
-            "wk52_low":    info.get("fiftyTwoWeekLow"),
+            "pe":          _f(info.get("trailingPE")),
+            "forward_pe":  _f(info.get("forwardPE")),
+            "pb":          _f(info.get("priceToBook")),
+            "market_cap":  _f(info.get("marketCap")),
+            "beta":        _f(info.get("beta")),
+            "roe":         _f(info.get("returnOnEquity")),
+            "profit_margin": _f(info.get("profitMargins")),
+            "debt_to_equity": _f(info.get("debtToEquity")),
+            "div_yield":   _f(info.get("dividendYield")),
+            "wk52_high":   _f(info.get("fiftyTwoWeekHigh")),
+            "wk52_low":    _f(info.get("fiftyTwoWeekLow")),
             "industry":    info.get("industry"),
         }
         return ticker, sector, name, analyst, fundamentals
