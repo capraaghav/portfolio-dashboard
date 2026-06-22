@@ -82,9 +82,19 @@ def _resolve_one_name(query: str, csv_ltp: float | None = None) -> str | None:
     simplified core query, merges candidates, then lets the CSV's LTP decide (the
     candidate whose live price matches the CSV price wins — catches 'ABB INDIA' → ABB,
     not Abbott India). Falls back to name similarity when no price match is found."""
+    qup = query.strip().upper()
+    # If the cleaned name is itself a clean ticker (e.g. 'SAIL' from 'SAIL EQUITY
+    # SHARES'), use it directly — Yahoo's fuzzy search often returns a look-alike.
+    if not re.match(r"^IN[A-Z][0-9A-Z]{9}$", qup) and re.match(r"^[A-Z0-9&\-]{2,12}$", qup):
+        return qup
+
+    # Search several phrasings — Yahoo's NSE coverage is sensitive to exact wording.
     queries = [query]
+    no_suffix = re.sub(r"\s+", " ", re.sub(r"\b(LIMITED|LTD)\b", "", qup)).strip()
+    if no_suffix and no_suffix != qup:
+        queries.append(no_suffix)
     core = _core_query(query)
-    if core and core != query.upper():
+    if core and core not in (qup, no_suffix):
         queries.append(core)
 
     seen, cands = set(), []

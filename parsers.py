@@ -139,7 +139,13 @@ _KEEP_COLS = ["ticker", "shares", "avg_cost", "ltp", "current_value", "pnl",
 
 _SYMBOL_RE = re.compile(r"^[A-Z0-9&.\-]+$")
 _LIMITED_RE = re.compile(r"\b(LIMITED|LTD)\b")
-_TRAILING_JUNK_RE = re.compile(r"\s+(EQ|NEW|FV|F\.V\.|SR|NCD|BOND|RS|RE)\b")
+# Broker instrument junk after the company name: '-EQ', '-EQ1/-', ' - EQ 2', 'RE1',
+# 'EQUITY', NSE series codes, face values. Cut at the first such marker.
+_TRAILING_JUNK_RE = re.compile(
+    r"[\s\-]+(EQUITY|EQ|BE|BZ|BL|SM|RT|GS|GB|NEW|FV|F\.V\.|SR|NCD|BOND|RS|RE)(?![A-Z])")
+# NSE series suffixes appended to clean tickers (INDOWIND-BE, DIL-BZ) — not part of
+# the Yahoo symbol. (Won't touch real hyphenated symbols like BAJAJ-AUTO.)
+_SERIES_SUFFIX_RE = re.compile(r"-(BE|BZ|BL|SM|RT|EQ|GS|GB|IL|IQ|N[12])$")
 _ISIN_RE = re.compile(r"^IN[A-Z][0-9A-Z]{9}$")
 
 
@@ -168,13 +174,18 @@ def classify_asset(name: str) -> str:
 def clean_company_name(name: str) -> str:
     """Strip broker instrument suffixes to get a searchable company name.
     'ABB INDIA LIMITED EQ NEW RS. 2/-' -> 'ABB INDIA LIMITED'
-    'UCO BANK EQ'                      -> 'UCO BANK'"""
+    'BHARAT ELECTRONIC-EQ'            -> 'BHARAT ELECTRONIC'
+    'ADANI WILMAR-EQ1/-'             -> 'ADANI WILMAR'
+    'HINDUSTAN UNILEV RE1'           -> 'HINDUSTAN UNILEV'"""
     s = str(name).upper().replace("''", "").replace('"', "").strip()
     m = _LIMITED_RE.search(s)
     if m:
-        s = s[:m.end()]
+        s = s[:m.end()]                       # keep up to and including LIMITED/LTD
     else:
-        s = _TRAILING_JUNK_RE.split(s)[0]
+        cut = _TRAILING_JUNK_RE.search(s)
+        if cut:
+            s = s[:cut.start()]
+    s = re.sub(r"[\s\-/]+$", "", s)            # trailing dashes/slashes/space
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -291,8 +302,11 @@ def parse_uploaded_file(f, account_name: str) -> pd.DataFrame:
         df["ticker"].astype(str).str.strip()
         .str.replace(r"\.(NS|BO|BSE|NSE)$", "", regex=True)
         .str.upper()
+        .str.replace(_SERIES_SUFFIX_RE, "", regex=True)   # drop -BE/-BZ/… NSE series codes
     )
-    df = df[df["ticker"].str.len() > 0]
+    # Keep real tickers/names only — drops footer/disclaimer paragraphs that some
+    # broker exports append as a trailing row (no real symbol or name is this long).
+    df = df[df["ticker"].str.len().between(1, 50)]
     df = df[~df["ticker"].str.lower().isin(_SKIP_TICKERS)]
 
     for col in _NUMERIC_COLS:
