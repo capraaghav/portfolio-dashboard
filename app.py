@@ -498,9 +498,44 @@ with tabs[1]:
         disp["Beta"] = disp["Beta"].apply(lambda x: fmt_num(x, 2))
         disp["52w %"] = disp["52w %"].apply(lambda x: f"{x:.0f}%" if not pd.isna(x) else "—")
 
-    st.dataframe(disp, width='stretch', hide_index=True,
-                 height=min(45 + 36 * len(disp), 600))
-    st.caption(f"Showing {len(disp)} of {len(holdings)} holdings.")
+    event = st.dataframe(disp, width='stretch', hide_index=True,
+                         height=min(45 + 36 * len(disp), 600),
+                         on_select="rerun", selection_mode="single-row",
+                         key="holdings_table")
+    st.caption(f"Showing {len(disp)} of {len(holdings)} holdings.  "
+               "💡 Click a row to see its per-account split.")
+
+    # ── Per-account breakdown for the selected stock (when held in 2+ accounts) ──
+    sel = list(event.selection.rows) if (event and event.selection) else []
+    if sel and sel[0] < len(fh):
+        srow = fh.iloc[sel[0]]
+        t, company = srow["Ticker"], srow["Company"]
+        sub = fr[fr["ticker"] == t]
+        accts = sorted(sub["account"].unique())
+        st.markdown(f"#### Per-account split — {t} · {company}")
+        if len(accts) <= 1:
+            st.caption(f"Held only in **{accts[0] if accts else '—'}** — no multi-account split.")
+        else:
+            bd = analytics.per_account_breakdown(sub, prices, meta)
+            tot_sh = bd["Shares"].sum()
+            tot_cost = bd["Cost Basis (₹)"].sum()
+            tot_val = bd["Current Value (₹)"].sum()
+            tot_pnl = bd["Gain/Loss (₹)"].sum()
+            total = {
+                "Account": "TOTAL", "Shares": tot_sh,
+                "Avg Cost (₹)": (tot_cost / tot_sh) if tot_sh else np.nan,
+                "Live Price (₹)": srow["Live Price (₹)"],
+                "Current Value (₹)": tot_val, "Cost Basis (₹)": tot_cost,
+                "Gain/Loss (₹)": tot_pnl,
+                "Gain/Loss (%)": (tot_pnl / tot_cost * 100) if tot_cost > 0 else np.nan,
+            }
+            bd = pd.concat([bd, pd.DataFrame([total])], ignore_index=True)
+            bdisp = bd.copy()
+            for col in ["Avg Cost (₹)", "Live Price (₹)", "Current Value (₹)", "Cost Basis (₹)", "Gain/Loss (₹)"]:
+                bdisp[col] = bdisp[col].apply(fmt_inr)
+            bdisp["Gain/Loss (%)"] = bdisp["Gain/Loss (%)"].apply(fmt_pct)
+            bdisp["Shares"] = bdisp["Shares"].apply(lambda x: f"{x:,.2f}" if not pd.isna(x) else "—")
+            st.dataframe(bdisp, width='stretch', hide_index=True)
 
     ec1, ec2 = st.columns([1, 4])
     with ec1:

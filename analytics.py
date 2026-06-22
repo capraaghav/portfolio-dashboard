@@ -145,6 +145,28 @@ def portfolio_totals(holdings: pd.DataFrame) -> dict:
     }
 
 
+def per_account_breakdown(sub: pd.DataFrame, prices: dict, meta: dict) -> pd.DataFrame:
+    """One row per account for a single ticker's slice of `raw`. Reuses
+    build_holdings per account so the figures reconcile with the consolidated row."""
+    rows = []
+    for acct, grp in sub.groupby("account"):
+        ah = build_holdings(grp, prices, meta)
+        if ah.empty:
+            continue
+        r = ah.iloc[0]
+        rows.append({
+            "Account": acct,
+            "Shares": r["Shares"],
+            "Avg Cost (₹)": r["Avg Cost (₹)"],
+            "Live Price (₹)": r["Live Price (₹)"],
+            "Current Value (₹)": r["Current Value (₹)"],
+            "Cost Basis (₹)": r["Cost Basis (₹)"],
+            "Gain/Loss (₹)": r["Gain/Loss (₹)"],
+            "Gain/Loss (%)": r["Gain/Loss (%)"],
+        })
+    return pd.DataFrame(rows)
+
+
 # ─── Risk & concentration ─────────────────────────────────────────────────────
 
 def risk_metrics(holdings: pd.DataFrame, fundamentals: dict | None = None) -> dict:
