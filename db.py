@@ -11,12 +11,14 @@ Postgres row-level security keeps each user's rows private.
 
 from __future__ import annotations
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 _COOKIE = "sb_refresh"  # browser cookie that survives a full page refresh
+_COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 
 
 # ─── Config / client ──────────────────────────────────────────────────────────
@@ -52,37 +54,35 @@ def _client():
 
 # ─── Cookie (keeps you logged in across a full browser refresh) ───────────────
 
-def _cookie_mgr():
-    """One CookieManager per session, memoised in session_state (NOT cache_resource,
-    which Streamlit forbids around widgets, and constructed once so there's no
-    DuplicateWidgetID). Returns None if the optional component isn't installed —
-    login then simply won't survive a hard refresh (the pre-cookie behaviour)."""
-    if "_sb_ckmgr" not in st.session_state:
-        try:
-            import extra_streamlit_components as stx
-            st.session_state["_sb_ckmgr"] = stx.CookieManager(key="sb_ck_init")
-        except Exception:
-            return None
-    return st.session_state.get("_sb_ckmgr")
+def _write_cookie(value: str, max_age: int) -> None:
+    """Set (or, with max_age=0, clear) the refresh-token cookie on the TOP-LEVEL app
+    document by writing document.cookie from a same-origin srcdoc iframe. Because the
+    cookie lands on the app's own origin, st.context.cookies (which reads the top-level
+    request cookies) can see it on the next page load. This sidesteps the question of
+    whether a custom-component iframe is same-origin."""
+    try:
+        cookie_js = (
+            json.dumps(_COOKIE) + "+'='+encodeURIComponent(" + json.dumps(value) + ")"
+            "+';path=/;max-age=" + str(int(max_age)) + ";SameSite=Lax'"
+        )
+        html = (
+            "<script>(function(){var c=" + cookie_js + ";"
+            "try{if(window.parent&&window.parent.document){window.parent.document.cookie=c;}}catch(e){}"
+            "try{document.cookie=c;}catch(e){}"
+            "})();</script>"
+        )
+        components.html(html, height=0)
+    except Exception:
+        pass
 
 
 def _set_cookie(refresh_token: str | None) -> None:
-    mgr = _cookie_mgr()
-    if mgr is not None and refresh_token:
-        try:
-            mgr.set(_COOKIE, refresh_token,
-                    expires_at=datetime.now() + timedelta(days=30), key="sb_ck_set")
-        except Exception:
-            pass
+    if refresh_token:
+        _write_cookie(refresh_token, _COOKIE_MAX_AGE)
 
 
 def _clear_cookie() -> None:
-    mgr = _cookie_mgr()
-    if mgr is not None:
-        try:
-            mgr.delete(_COOKIE, key="sb_ck_del")  # raises KeyError if already absent
-        except Exception:
-            pass
+    _write_cookie("", 0)
 
 
 def _read_cookie() -> str | None:

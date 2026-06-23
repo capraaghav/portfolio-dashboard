@@ -206,6 +206,11 @@ with st.sidebar:
             # holdings) so the next person to log in on this browser starts clean.
             st.session_state.clear()
             st.rerun()
+        if st.query_params.get("debug") == "1":
+            # Temporary: append ?debug=1 to the URL to see whether the server can read
+            # the persistence cookie back (visible only after a reload/reconnect).
+            st.caption("🔧 sb_refresh cookie seen by server: "
+                       + ("YES ✓" if db._read_cookie() else "no ✗"))
     section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
     st.divider()
 
