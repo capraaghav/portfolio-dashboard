@@ -15,7 +15,6 @@ from datetime import date, datetime, timezone
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 _COOKIE = "sb_refresh"  # browser cookie that survives a full page refresh
 _COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
@@ -54,46 +53,74 @@ def _client():
 
 # ─── Cookie (keeps you logged in across a full browser refresh) ───────────────
 
-def _write_cookie(value: str, max_age: int) -> None:
-    """Set (or, with max_age=0, clear) the refresh-token cookie on the TOP-LEVEL app
-    document by writing document.cookie from a same-origin srcdoc iframe. Because the
-    cookie lands on the app's own origin, st.context.cookies (which reads the top-level
-    request cookies) can see it on the next page load. This sidesteps the question of
-    whether a custom-component iframe is same-origin."""
+def init_cookies() -> None:
+    """Construct the CookieManager once per run (canonical extra-streamlit-components
+    usage). Reconstructing each run under a stable key — rather than memoising the
+    instance — is what makes reads reliable: the component re-reads the browser's
+    cookies every run and delivers them via its mount rerun. Call once at the top of
+    the run, before any get/set/delete."""
     try:
-        cookie_js = (
-            json.dumps(_COOKIE) + "+'='+encodeURIComponent(" + json.dumps(value) + ")"
-            "+';path=/;max-age=" + str(int(max_age)) + ";SameSite=Lax'"
-        )
-        html = (
-            "<script>(function(){var c=" + cookie_js + ";"
-            "try{if(window.parent&&window.parent.document){window.parent.document.cookie=c;}}catch(e){}"
-            "try{document.cookie=c;}catch(e){}"
-            "})();</script>"
-        )
-        components.html(html, height=0)
+        import extra_streamlit_components as stx
+        st.session_state["_sb_ckmgr"] = stx.CookieManager(key="sb_cookies")
     except Exception:
-        pass
+        st.session_state["_sb_ckmgr"] = None
+
+
+def _cookie_mgr():
+    return st.session_state.get("_sb_ckmgr")
 
 
 def _set_cookie(refresh_token: str | None) -> None:
-    if refresh_token:
-        _write_cookie(refresh_token, _COOKIE_MAX_AGE)
+    mgr = _cookie_mgr()
+    if mgr is not None and refresh_token:
+        try:
+            mgr.set(_COOKIE, refresh_token, key="sb_ck_set",
+                    max_age=_COOKIE_MAX_AGE, same_site="lax")
+        except Exception:
+            pass
 
 
 def _clear_cookie() -> None:
-    _write_cookie("", 0)
+    mgr = _cookie_mgr()
+    if mgr is not None:
+        try:
+            mgr.delete(_COOKIE, key="sb_ck_del")  # raises KeyError if already absent
+        except Exception:
+            pass
 
 
-def _read_cookie() -> str | None:
-    """Read the refresh-token cookie natively from the page-load request headers.
-    Unlike the component's get_all() round-trip, this is available immediately on the
-    first run after a reload (Streamlit 1.42+), so there's no login flash and no
-    dependence on a follow-up rerun."""
+def _read_cookie_native() -> str | None:
+    """Native page-load cookie (Streamlit 1.42+). May be empty on Streamlit Cloud."""
     try:
         return st.context.cookies.get(_COOKIE)
     except Exception:
         return None
+
+
+def _read_cookie() -> str | None:
+    """Prefer the component's own read — it reliably sees the first-party cookie it set
+    (same iframe/origin) — then fall back to the native page-load cookies."""
+    mgr = _cookie_mgr()
+    if mgr is not None:
+        try:
+            tok = mgr.get(_COOKIE)
+            if tok:
+                return tok
+        except Exception:
+            pass
+    return _read_cookie_native()
+
+
+def cookie_debug() -> str:
+    """One-line readout for the temporary [authdiag] log: which read path sees it."""
+    mgr = _cookie_mgr()
+    comp = None
+    if mgr is not None:
+        try:
+            comp = mgr.get(_COOKIE)
+        except Exception:
+            comp = None
+    return f"comp_seen={comp is not None} native_seen={_read_cookie_native() is not None}"
 
 
 def persist_cookie() -> None:

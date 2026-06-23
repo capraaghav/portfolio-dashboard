@@ -135,11 +135,11 @@ USE_DB = db.is_enabled()
 store = db if USE_DB else storage
 
 if USE_DB:
+    db.init_cookies()     # construct the CookieManager once for this run (before any get/set)
     db.restore_session()  # re-auth from cookie after a browser refresh wipes session_state
-    # Temporary server-side diagnostic — shows in the Streamlit Cloud logs whether the
-    # browser sent the persistence cookie and whether we ended up authenticated.
-    print(f"[authdiag] cookie_seen={db._read_cookie() is not None} "
-          f"logged_in={db.current_user() is not None}", flush=True)
+    # Temporary server-side diagnostic — shows in the Streamlit Cloud logs which read
+    # path sees the persistence cookie and whether we ended up authenticated.
+    print(f"[authdiag] {db.cookie_debug()} logged_in={db.current_user() is not None}", flush=True)
     if not db.current_user():
         db.render_auth()
         st.stop()
