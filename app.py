@@ -236,7 +236,11 @@ if uploaded:
         st.error(f"**`{fname}`** — {err}")
     if raw is not None:
         storage.save_session(raw)
-elif use_saved:
+    st.session_state["_use_saved"] = False
+elif use_saved or st.session_state.get("_use_saved"):
+    # Keep the loaded session across reruns (the button is one-shot) so filters/
+    # interactions don't drop the data.
+    st.session_state["_use_saved"] = True
     raw = storage.load_session()
 
 if raw is None or raw.empty:
@@ -510,6 +514,20 @@ elif section == "📋 Holdings":
 
     show_fund = st.checkbox("Show fundamentals (P/E, P/B, Mkt Cap, Beta, 52w)", value=False) if load_meta else False
 
+    # ── Category filters — selecting a value shows only matching holdings ──
+    sectors_avail = sorted([s for s in holdings["Sector"].dropna().unique() if s])
+    atypes_avail = sorted(set(asset_of.values()))
+    nf1, nf2, nf3 = st.columns(3)
+    sector_sel = nf1.selectbox("Sector", ["All sectors"] + sectors_avail)
+    type_sel = nf2.selectbox("Asset type", ["All types"] + atypes_avail)
+    trend_sel = nf3.selectbox(
+        "Trend", (["All trends"] + [s for s in SIGNAL_ORDER if s != "N/A"]) if ta_signals else ["All trends"],
+        disabled=not ta_signals,
+        help=None if ta_signals else "Turn on Technical analysis in the sidebar to filter by trend.")
+    in_all = (st.checkbox("🔗 Held in all accounts only", value=False,
+                          help="Show only stocks held in every selected account.")
+              if n_accounts > 1 else False)
+
     fr = raw[raw["account"].isin(sel_accounts)] if sel_accounts else raw
     fh = analytics.build_holdings(fr, prices, meta)
 
@@ -536,6 +554,15 @@ elif section == "📋 Holdings":
     if search:
         s = search.strip().upper()
         fh = fh[fh["Ticker"].str.contains(s) | fh["Company"].str.upper().str.contains(s)]
+    if sector_sel != "All sectors":
+        fh = fh[fh["Sector"] == sector_sel]
+    if type_sel != "All types":
+        fh = fh[fh["Ticker"].map(lambda t: asset_of.get(t, "Equity")) == type_sel]
+    if ta_signals and trend_sel != "All trends":
+        fh = fh[fh["Ticker"].map(lambda t: ta_signals.get(t, {}).get("signal", "N/A")) == trend_sel]
+    if in_all:
+        n_sel = len(sel_accounts) if sel_accounts else len(all_accounts)
+        fh = fh[fh["Accounts"].apply(lambda s: len(str(s).split(", ")) == n_sel)]
 
     if sort_col == "Trend" and "_sig" in fh.columns:
         fh = fh.sort_values("_sig", na_position="last")
