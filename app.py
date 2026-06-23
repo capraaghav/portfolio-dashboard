@@ -21,6 +21,7 @@ import charts
 import market_data as md
 import parsers
 import storage
+from click_spark import click_spark
 from formatting import (
     fmt_inr, fmt_pct, fmt_num, fmt_int, fmt_mcap,
     REC_LABEL, SIGNAL_ORDER, GAIN, LOSS,
@@ -96,6 +97,9 @@ hr { border-color: #1c1c1c; }
 [data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
+
+# Global click-spark effect (gold sparks radiate from every click)
+click_spark(spark_color="#C9A87A", spark_size=13, spark_radius=30, spark_count=9, duration=400)
 
 # ─── Multi-user / hosting isolation ──────────────────────────────────────────
 # When hosted for several people (set PORTFOLIO_MULTIUSER=1 as an env var or in
