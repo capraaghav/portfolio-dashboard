@@ -1,0 +1,23 @@
+# Render Blueprint — deploys the Streamlit Portfolio Dashboard as a web service.
+# Render reads this on "New → Blueprint". Streamlit needs a single always-on process
+# with WebSocket support, which a Render web service provides.
+services:
+  - type: web
+    name: portfolio-dashboard
+    runtime: python
+    plan: free                # bump to "starter" (~$7/mo) for always-on (no idle sleep)
+    region: oregon            # change to "frankfurt"/"singapore" etc. if closer to you
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    healthCheckPath: /_stcore/health   # Streamlit's built-in health endpoint
+    autoDeploy: true          # redeploy on every push to the connected branch
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"       # wheel-safe; avoids source builds of pyarrow/curl_cffi
+      # Set these in the Render dashboard (Environment) — never committed. Their
+      # presence switches the app into Supabase accounts mode; omit them to run the
+      # local / per-session product instead.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
