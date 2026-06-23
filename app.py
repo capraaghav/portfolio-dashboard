@@ -137,9 +137,6 @@ store = db if USE_DB else storage
 if USE_DB:
     db.init_cookies()     # construct the CookieManager once for this run (before any get/set)
     db.restore_session()  # re-auth from cookie after a browser refresh wipes session_state
-    # Temporary server-side diagnostic — shows in the Streamlit Cloud logs which read
-    # path sees the persistence cookie and whether we ended up authenticated.
-    print(f"[authdiag] {db.cookie_debug()} logged_in={db.current_user() is not None}", flush=True)
     if not db.current_user():
         db.render_auth()
         st.stop()
@@ -210,11 +207,6 @@ with st.sidebar:
             # holdings) so the next person to log in on this browser starts clean.
             st.session_state.clear()
             st.rerun()
-        if st.query_params.get("debug") == "1":
-            # Temporary: append ?debug=1 to the URL to see whether the server can read
-            # the persistence cookie back (visible only after a reload/reconnect).
-            st.caption("🔧 sb_refresh cookie seen by server: "
-                       + ("YES ✓" if db._read_cookie() else "no ✗"))
     section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
     st.divider()
 

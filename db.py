@@ -111,18 +111,6 @@ def _read_cookie() -> str | None:
     return _read_cookie_native()
 
 
-def cookie_debug() -> str:
-    """One-line readout for the temporary [authdiag] log: which read path sees it."""
-    mgr = _cookie_mgr()
-    comp = None
-    if mgr is not None:
-        try:
-            comp = mgr.get(_COOKIE)
-        except Exception:
-            comp = None
-    return f"comp_seen={comp is not None} native_seen={_read_cookie_native() is not None}"
-
-
 def persist_cookie() -> None:
     """(Re)write the refresh-token cookie on every logged-in run. Doing it on a normal
     run — rather than only at the login click, which is immediately followed by a
