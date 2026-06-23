@@ -95,8 +95,32 @@ hr { border-color: #1c1c1c; }
   border-radius: 10px; border: 1px solid #2a2a2a; background: #161616; color: #EDEDED; font-weight: 500; }
 .stButton button:hover, .stDownloadButton button:hover { border-color: #C9A87A; color: #C9A87A; }
 [data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
+
+/* ── Skeleton loaders ── */
+.sk { background: linear-gradient(90deg, #141414 25%, #1f1f1f 37%, #141414 63%);
+  background-size: 400% 100%; animation: sksh 1.4s ease infinite; border-radius: 8px; }
+@keyframes sksh { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+.sk-card { background: #121212; border: 1px solid #232323; border-radius: 14px; padding: 1.1rem; }
+.sk-row { display: flex; gap: 14px; margin: 1rem 0; }
 </style>
 """, unsafe_allow_html=True)
+
+# Dashboard-shaped skeleton shown while the first (cold) data load runs
+_sk_cards = "".join(
+    '<div class="sk-card" style="flex:1;">'
+    '<div class="sk" style="height:12px;width:55%;margin-bottom:14px;"></div>'
+    '<div class="sk" style="height:26px;width:78%;"></div></div>' for _ in range(4))
+_SKELETON = f"""
+<div style="max-width:1400px;margin:0 auto;">
+  <div style="text-align:center;padding:1.6rem 0 0.4rem;">
+    <div class="sk" style="height:14px;width:150px;margin:0 auto 14px;"></div>
+    <div class="sk" style="height:50px;width:320px;margin:0 auto 12px;"></div>
+    <div class="sk" style="height:16px;width:220px;margin:0 auto;"></div>
+  </div>
+  <div class="sk-row">{_sk_cards}</div>
+  <div class="sk-card" style="margin-top:0.6rem;"><div class="sk" style="height:360px;width:100%;"></div></div>
+</div>
+"""
 
 # Global click-spark effect (gold sparks radiate from every click)
 click_spark(spark_color="#C9A87A", spark_size=13, spark_radius=30, spark_count=9, duration=400)
@@ -258,6 +282,12 @@ risk metrics · dividends · per-stock drill-down · benchmark vs NIFTY · rebal
 
 # ─── Resolve symbols (some brokers store the full company name or only an ISIN) ─
 
+# Show a dashboard-shaped skeleton while the first (cold) load runs; cleared once
+# holdings are built. Skipped on later reruns (caches are warm → no flicker).
+_sk = st.empty()
+if not st.session_state.get("_data_ready"):
+    _sk.markdown(_SKELETON, unsafe_allow_html=True)
+
 orig_syms = tuple(sorted(raw["ticker"].unique()))
 asset_types, clean_map, need_search = {}, {}, {}
 for t in orig_syms:
@@ -367,6 +397,10 @@ has_targets = load_meta and any(v.get("target_mean") for v in analyst_data.value
 holdings = analytics.build_holdings(raw, prices, meta)
 totals = analytics.portfolio_totals(holdings)
 n_accounts = raw["account"].nunique()
+
+# Data is ready — clear the loading skeleton
+st.session_state["_data_ready"] = True
+_sk.empty()
 
 # Portfolio day change (from quotes × shares)
 shares_map = dict(zip(holdings["Ticker"], holdings["Shares"]))
