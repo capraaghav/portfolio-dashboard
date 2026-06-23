@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Product** | Portfolio Dashboard — unified stock-portfolio analytics for Indian markets (NSE/BSE) |
-| **Document version** | 1.0 |
+| **Document version** | 1.1 |
 | **Status** | Live (shipped) |
 | **Last updated** | 2026-06-23 |
 | **Owner** | Raaghav Pilaniwala |
 | **Repository** | github.com/capraaghav/portfolio-dashboard |
-| **Tech stack** | Python · Streamlit · pandas · yfinance · Plotly · pdfplumber |
+| **Tech stack** | Python · Streamlit · pandas · yfinance · Plotly · pdfplumber · Supabase (optional) |
 
 ---
 
@@ -27,6 +27,13 @@ It is **local-first and privacy-preserving** by design — holdings are processe
 the user's own machine and never uploaded to a third party (the only outbound calls
 are anonymous market-data lookups). It can also be **hosted as a zero-install shared
 link**, in which case each visitor's data is isolated to their own session.
+
+Optionally, the hosted deployment can be put behind **email-login user accounts with
+per-user cloud persistence** (Supabase Auth + Postgres with row-level security), so a
+user's portfolio, snapshots, watchlist, and overrides survive server reboots and
+follow them across devices — while remaining private to their account. This backend
+is **opt-in and additive**: with no Supabase configured the app behaves exactly as
+the local-first / per-session product described above.
 
 The defining capability is the **ingestion & resolution engine**: it accepts the
 messy, inconsistent exports that Indian brokers actually produce — company names
@@ -90,7 +97,10 @@ actually produce.
 - **No multi-currency / non-Indian markets** (NSE/BSE focus; ₹).
 - **No mutual-fund NAV engine / SIP tracking** (MFs are detected and shown at CSV
   value, not deeply analysed).
-- **No user accounts, multi-user collaboration, or a backend database.**
+- **No multi-user collaboration / sharing.** Accounts (when enabled) are private and
+  single-owner — no shared portfolios, teams, or social features.
+- **No mandatory accounts.** User accounts and a cloud database are an **optional,
+  opt-in** backend (§6.8); the app fully functions with no account and no backend.
 
 ---
 
@@ -204,7 +214,7 @@ mis-assigns** — an unresolved holding is kept at its CSV value rather than gue
 | # | Tab | Requirements |
 |---|---|---|
 | 1 | **📊 Overview** | Treemap heatmap (size = value, colour = P&L, grouped by sector); allocation donuts by stock and by sector; per-account totals table + stacked bar (when >1 account). |
-| 2 | **📋 Holdings** | Sortable/searchable table; filter by account; toggle fundamentals columns; export to Excel; manual price override; **click a row → per-account split** of that stock (shares, cost, value, P&L per account + TOTAL) for stocks held in 2+ accounts. |
+| 2 | **📋 Holdings** | Sortable/searchable table; toggle fundamentals columns; export to Excel; manual price override; **click a row → per-account split** of that stock (shares, cost, value, P&L per account + TOTAL) for stocks held in 2+ accounts. **Filters (combinable):** sector, asset type (Equity/Fund/Bond), technical trend signal, account, and a **"held in all accounts only"** toggle — each narrows the table to matching holdings only. |
 | 3 | **📈 Performance** | Auto-saved daily **snapshots** → portfolio value timeline; **XIRR** (when purchase dates exist); **benchmark backtest** of the current basket vs a chosen index, with alpha. |
 | 4 | **🔬 Technical** | SMA 20/50/200 + RSI 14 → trend signal per stock (Strong Bull → Strong Bear); signal-count cards; vs-50MA and RSI bar charts. |
 | 5 | **🎯 Analysts** | 12-month consensus price targets (low/mean/high) with upside %, Buy/Hold/Sell consensus, # analysts; target-range chart; coverage count. |
@@ -221,19 +231,59 @@ price coverage (X/Y). Gain/loss shows "—" when the file has no cost basis.
 
 ### 6.7 Persistence
 - **FR-7.1** Auto-save a **daily snapshot** of total value + per-stock values.
-- **FR-7.2** Remember the **last session** so the user can reload without re-uploading.
+- **FR-7.2** Remember the **last session** so the user can reload without re-uploading;
+  the loaded session survives reruns (filtering/interaction does not drop it).
 - **FR-7.3** Persist **watchlist** and **manual price overrides**.
-- **FR-7.4** All persistence under a local `data/` folder; in hosted mode, an
-  isolated per-session temp folder.
+- **FR-7.4** **Local / per-session storage (default):** all persistence under a local
+  `data/` folder; in hosted multi-user mode, an isolated per-session temp folder.
+- **FR-7.5** **Cloud storage (optional, when Supabase is configured):** the same four
+  artifacts (last session, snapshots, watchlist, overrides) are stored **per user in
+  Supabase Postgres** instead of local files, keyed to the authenticated user and
+  protected by row-level security, so they persist across reboots and devices. The
+  storage layer is interface-compatible with the local one (`db.py` mirrors
+  `storage.py`), so call sites are identical.
+
+### 6.8 Accounts & authentication (optional backend)
+*Active only when `SUPABASE_URL` + `SUPABASE_ANON_KEY` secrets are present; otherwise
+the app runs with no login, exactly as the local-first product.*
+
+- **FR-8.1** **Email login / sign-up gate** (Supabase Auth). When enabled, an
+  unauthenticated visitor sees a branded login / sign-up screen and the dashboard is
+  withheld until they authenticate.
+- **FR-8.2** **Per-user data isolation via row-level security** — each user can read
+  and write only their own rows (`auth.uid() = user_id`); a second account sees none
+  of the first's data, enforced in Postgres (not just the client).
+- **FR-8.3** **Stay logged in across a browser refresh** — the Supabase refresh token
+  is held in a browser cookie and used to re-authenticate on load, so a hard refresh
+  (which clears Streamlit session state) restores the session instead of forcing
+  re-login. Tokens rotate on refresh; logout deletes the cookie and clears all
+  per-user session state so the next user on a shared browser starts clean.
+- **FR-8.4** **Sidebar account controls** — the logged-in user's email and a **Log
+  out** button; the privacy caption reflects the active storage mode.
+- **FR-8.5** **Graceful, additive design** — the anon key is safe client-side (RLS is
+  the protection); if the backend is unconfigured or unreachable, the app falls back
+  to local behaviour rather than failing.
+
+### 6.9 Interface & feedback polish
+- **FR-9.1** **Skeleton loaders** — a dashboard-shaped placeholder (hero + KPI cards +
+  chart block) renders during the first cold data load, replaced once holdings are
+  built; skipped on warm reruns to avoid flicker.
+- **FR-9.2** **Click-spark effect** — a lightweight canvas animation emits gold sparks
+  from each click across the app (ported from a React component to a Streamlit-injected
+  canvas overlay that persists across reruns). Purely decorative; non-blocking.
 
 ---
 
 ## 7. Non-functional requirements
 
 - **NFR-1 Privacy.** In local mode, holdings never leave the machine; only anonymous
-  market-data lookups (Yahoo/NSE/DuckDuckGo) go out. In hosted mode
+  market-data lookups (Yahoo/NSE/DuckDuckGo) go out. In hosted per-session mode
   (`PORTFOLIO_MULTIUSER=1`), each browser session gets an isolated temp directory so
-  no visitor can see another's data.
+  no visitor can see another's data. In **accounts mode (Supabase)**, holdings are
+  stored in the user's own database rows, isolated by Postgres row-level security so
+  no user can read another's data; secrets (URL/anon key) live only in Streamlit
+  secrets and are never committed (the anon key is safe to expose — RLS is the
+  control).
 - **NFR-2 Resilience to rate limits.** Bulk-download quotes/history; retry `.info`
   with backoff; gracefully degrade (fall back to Yahoo-only, or CSV value) if a data
   source is unreachable; never crash on a missing/odd field (numeric coercion +
@@ -253,29 +303,41 @@ price coverage (X/Y). Gain/loss shows "—" when the file has no cost basis.
 ## 8. Technical architecture
 
 **Pattern:** a single Streamlit app composed of focused, independently-testable
-Python modules. No backend server, no database — state is the uploaded file plus a
-local `data/` folder and Streamlit's per-session cache.
+Python modules. Default state is the uploaded file plus a local `data/` folder and
+Streamlit's per-session cache; an **optional Supabase backend** can swap in cloud
+accounts + per-user storage without changing call sites.
 
 | Module | Responsibility |
 |---|---|
-| `app.py` | UI orchestration: sidebar, data-loading pipeline, summary cards, the 11 tabs, hosting/multi-user gating. |
+| `app.py` | UI orchestration: sidebar, data-loading pipeline, summary cards, the 11 tabs, hosting/multi-user gating, and the backend selector (`store = db if db.is_enabled() else storage`) + auth gate. |
 | `parsers.py` | File reading + broker detection + normalisation to the canonical schema; CSV/Excel/PDF; company-name cleaning; ISIN/series-suffix handling. |
 | `market_data.py` | All Yahoo Finance fetching (quotes, metadata, TA history, dividends, benchmarks, per-stock detail), the 3-tier resolution chain, and the NSE master fetch. Cached. |
 | `analytics.py` | Pure (no-I/O) computation: holdings consolidation, totals, per-account breakdown, technical indicators, risk metrics, LTCG/STCG tax, XIRR, synthetic backtest curve, rebalancing. |
 | `charts.py` | Reusable Plotly figure builders (treemap, donuts, candlestick, benchmark overlay, etc.). |
 | `storage.py` | Local persistence (snapshots, last session, watchlist, overrides); configurable data directory for per-session isolation. |
+| `db.py` | **Optional Supabase backend** — email auth (sign-in/up/out, cookie-based session restore) + per-user cloud storage, mirroring `storage.py`'s signatures so it is a drop-in alternative; per-session client; activates only when secrets are present. |
+| `click_spark.py` | Decorative click-spark canvas overlay (JS injected via a Streamlit component, persists across reruns). |
 | `formatting.py` | Indian ₹/%/number formatters (defensive: coerce-or-"—") + shared colour/label constants. |
 
 **Data flow:** upload → `parsers.parse_all` → resolution (`market_data.resolve_symbols`)
 → rename to clean tickers → `market_data.fetch_quotes` (+ optional metadata/TA/dividends)
 → `analytics.build_holdings` → tabs render via `charts` + `formatting`.
 
-**External services (read-only, anonymous):** Yahoo Finance (`yfinance` +
+**External services:** *(read-only, anonymous, always)* Yahoo Finance (`yfinance` +
 `query2.finance.yahoo.com/v1/finance/search`), NSE archives
-(`archives.nseindia.com/.../EQUITY_L.csv`), DuckDuckGo HTML search.
+(`archives.nseindia.com/.../EQUITY_L.csv`), DuckDuckGo HTML search. *(authenticated,
+per-user, only when accounts are enabled)* Supabase Auth + Postgres REST.
+
+**Backend selection:** at startup `db.is_enabled()` checks for Supabase secrets +
+the `supabase` package; if present the app gates on login and routes all persistence
+through `db.py`, otherwise it uses `storage.py` (local/per-session). The Supabase
+client is created **per session** (in `st.session_state`, never `cache_resource`,
+which would be shared across users); auth tokens are kept in session state and a
+refresh-token cookie.
 
 **Key dependencies:** streamlit ≥1.35, pandas, numpy, yfinance, plotly, openpyxl,
-pyarrow, curl_cffi, pdfplumber.
+pyarrow, curl_cffi, pdfplumber; *(optional accounts)* supabase ≥2.0,
+extra-streamlit-components ≥0.1.71.
 
 ---
 
@@ -302,9 +364,14 @@ pyarrow, curl_cffi, pdfplumber.
 - **Local:** `pip install -r requirements.txt` then `streamlit run app.py`, or
   double-click `run.command` (macOS) / `run.bat` (Windows). Opens at
   `localhost:8501`. Persistent `data/` folder.
-- **Hosted (shared link):** push to GitHub → deploy on Streamlit Community Cloud,
-  with secret `PORTFOLIO_MULTIUSER = "1"` to enable per-session isolation. Auto-
-  rebuilds on each push.
+- **Hosted (shared link, no accounts):** push to GitHub → deploy on Streamlit
+  Community Cloud, with secret `PORTFOLIO_MULTIUSER = "1"` to enable per-session
+  isolation. Auto-rebuilds on each push.
+- **Hosted with accounts (optional):** create a Supabase project, run the schema
+  (`user_state` + `snapshots` tables, each with RLS policies `auth.uid() = user_id`),
+  and add `SUPABASE_URL` + `SUPABASE_ANON_KEY` to Streamlit secrets (and a gitignored
+  local `.streamlit/secrets.toml` for dev). Once present, the app requires login for
+  all visitors and stores data per user in Supabase. Secrets are never committed.
 - **Distribution:** a clean zip (`run.command`/`run.bat` + code, `data/` excluded)
   for recipients who prefer to run locally.
 
@@ -336,8 +403,9 @@ pyarrow, curl_cffi, pdfplumber.
 - Mutual-fund NAV resolution (AMFI) and deeper MF analytics.
 - Alerts (price/target/rebalance-drift) and goal tracking.
 - A small curated rename/alias map for well-known corporate renames.
-- Optional encrypted local persistence.
 - Correlation matrix / drawdown analytics on the Risk tab.
+- Auth enhancements for accounts mode: password reset, email verification flow, OAuth
+  providers, and an optional "continue as guest" (no-account) path on the login screen.
 
 ---
 
@@ -347,4 +415,6 @@ pyarrow, curl_cffi, pdfplumber.
   Number. **LTCG/STCG** — Long/Short-Term Capital Gains. **XIRR** — money-weighted
   annualised return. **HHI** — Herfindahl-Hirschman concentration index. **NSE/BSE**
   — National / Bombay Stock Exchange. **NCD** — Non-Convertible Debenture.
-  **SMA/RSI** — Simple Moving Average / Relative Strength Index.
+  **SMA/RSI** — Simple Moving Average / Relative Strength Index. **RLS** — Row-Level
+  Security (Postgres per-row access control). **Anon key** — Supabase's public client
+  key, safe to expose because RLS enforces access.
