@@ -41,7 +41,13 @@ html, body, .stApp, [data-testid="stAppViewContainer"], [class*="css"] {
 }
 .stApp { background: #0A0A0A; }
 .block-container { padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1400px; }
-#MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"] { display: none; }
+/* hide menu/footer/deploy chrome — but NOT the whole toolbar (it holds the sidebar
+   re-open button when the sidebar is collapsed) */
+#MainMenu, footer, [data-testid="stDecoration"], [data-testid="stAppDeployButton"] { display: none; }
+/* always keep the sidebar collapse/expand control visible & on-brand */
+[data-testid="stSidebarCollapsedControl"], [data-testid="stSidebarCollapseButton"] {
+  display: flex !important; visibility: visible !important; opacity: 1 !important; }
+[data-testid="stSidebarCollapsedControl"] svg, [data-testid="stSidebarCollapseButton"] svg { color: #C9A87A; }
 h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.01em; color: #EDEDED; }
 hr { border-color: #1c1c1c; }
 
