@@ -34,11 +34,60 @@ st.set_page_config(page_title="Portfolio Dashboard", page_icon="📈",
 
 st.markdown("""
 <style>
-[data-testid="stMetricValue"] { font-size: 1.5rem; }
-[data-testid="stMetricDelta"] { font-size: 0.95rem; }
-.block-container { padding-top: 1.2rem; }
-.stTabs [data-baseweb="tab-list"] { gap: 2px; flex-wrap: wrap; }
-.stTabs [data-baseweb="tab"] { padding: 6px 12px; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+html, body, .stApp, [data-testid="stAppViewContainer"], [class*="css"] {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.stApp { background: #0A0A0A; }
+.block-container { padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1400px; }
+#MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"] { display: none; }
+h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.01em; color: #EDEDED; }
+hr { border-color: #1c1c1c; }
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] { background: #0C0C0C; border-right: 1px solid #1c1c1c; }
+.brand-title { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.18em; color: #C9A87A; padding-top: 0.3rem; }
+.brand-sub { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6b6b; margin-bottom: 0.5rem; }
+[data-testid="stSidebar"] [role="radiogroup"] { gap: 2px; }
+[data-testid="stSidebar"] [role="radiogroup"] label {
+  display: flex; align-items: center; width: 100%; padding: 0.5rem 0.7rem; margin: 0;
+  border-radius: 10px; cursor: pointer; transition: background .15s; }
+[data-testid="stSidebar"] [role="radiogroup"] label:hover { background: #161616; }
+[data-testid="stSidebar"] [role="radiogroup"] label > div:first-child { display: none; }
+[data-testid="stSidebar"] [role="radiogroup"] label p { font-size: 0.95rem; color: #b9b9b9; font-weight: 500; }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) { background: #18170f; }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p { color: #C9A87A; font-weight: 600; }
+
+/* ── Metric → card ── */
+[data-testid="stMetric"] {
+  background: #141414; border: 1px solid #262626; border-radius: 14px;
+  padding: 1rem 1.1rem; }
+[data-testid="stMetricLabel"] p { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; color: #8B8B8B; }
+[data-testid="stMetricValue"] { font-size: 1.65rem; font-weight: 700; color: #EDEDED; }
+[data-testid="stMetricDelta"] { font-size: 0.9rem; }
+
+/* ── Bordered containers → cards ── */
+[data-testid="stVerticalBlockBorderWrapper"] {
+  background: #121212; border: 1px solid #232323 !important; border-radius: 16px; }
+
+/* ── Hero ── */
+.hero { text-align: center; padding: 1.4rem 0 0.6rem; }
+.hero-label { text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.8rem; color: #8B8B8B; }
+.hero-value { font-size: 3.4rem; font-weight: 800; color: #C9A87A; line-height: 1.05; margin: 0.2rem 0; letter-spacing: -0.02em; }
+.hero-pnl { font-size: 1.15rem; font-weight: 600; }
+.hero-pnl-muted { color: #6b6b6b; font-weight: 500; }
+.hero-sub { color: #8B8B8B; font-size: 0.9rem; margin-top: 0.2rem; }
+.section-title { font-size: 1.5rem; font-weight: 700; color: #EDEDED; margin-bottom: 0.2rem; }
+
+/* tabs / buttons / dataframe */
+.stTabs [data-baseweb="tab-list"] { gap: 2px; flex-wrap: wrap; border-bottom: 1px solid #1c1c1c; }
+.stTabs [data-baseweb="tab"] { padding: 6px 14px; border-radius: 8px 8px 0 0; }
+.stTabs [aria-selected="true"] { color: #C9A87A; }
+.stButton button, .stDownloadButton button {
+  border-radius: 10px; border: 1px solid #2a2a2a; background: #161616; color: #EDEDED; font-weight: 500; }
+.stButton button:hover, .stDownloadButton button:hover { border-color: #C9A87A; color: #C9A87A; }
+[data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,58 +144,56 @@ def to_excel_bytes(holdings_df: pd.DataFrame, totals: dict) -> bytes:
     return buf.getvalue()
 
 
-# ─── Sidebar ──────────────────────────────────────────────────────────────────
+# ─── Sidebar: brand + navigation + upload/data ───────────────────────────────
+
+SECTIONS = ["📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical", "🎯 Analysts",
+            "🧮 Tax", "⚠️ Risk", "💰 Dividends", "🔍 Stock Detail", "👁️ Watchlist", "⚖️ Rebalance"]
 
 with st.sidebar:
-    st.title("📈 Portfolio Dashboard")
-    st.caption("Local-only · Indian Markets · NSE / BSE")
+    st.markdown('<div class="brand-title">PORTFOLIO</div>'
+                '<div class="brand-sub">Indian Markets · NSE / BSE</div>', unsafe_allow_html=True)
+    section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
     st.divider()
 
-    st.subheader("Upload Holdings")
-    st.caption("CSV or Excel exports from any broker. Each file = one account.")
-    uploaded = st.file_uploader("Drop files here", type=["csv", "xlsx", "xls", "pdf"],
-                                accept_multiple_files=True, label_visibility="collapsed",
-                                key="uploader")
+    with st.expander("⚙️  Upload / Data", expanded=not bool(st.session_state.get("uploader"))):
+        st.caption("CSV / Excel / PDF from any broker. Each file = one account.")
+        uploaded = st.file_uploader("Drop files here", type=["csv", "xlsx", "xls", "pdf"],
+                                    accept_multiple_files=True, label_visibility="collapsed",
+                                    key="uploader")
 
-    account_names: dict[str, str] = {}
-    if uploaded:
-        st.subheader("Account Labels")
-        for f in uploaded:
-            default = f.name.rsplit(".", 1)[0].replace("_", " ").replace("-", " ").title()
-            account_names[f.name] = st.text_input(f"`{f.name}`", value=default, key=f"acct_{f.name}")
+        account_names: dict[str, str] = {}
+        if uploaded:
+            st.caption("Account labels")
+            for f in uploaded:
+                default = f.name.rsplit(".", 1)[0].replace("_", " ").replace("-", " ").title()
+                account_names[f.name] = st.text_input(f"`{f.name}`", value=default, key=f"acct_{f.name}")
 
-    # Offer to reload the last saved session if nothing is uploaded
-    use_saved = False
-    if not uploaded:
-        meta_info = storage.session_meta()
-        if meta_info:
-            st.info(f"Last session: **{meta_info.get('rows', '?')} rows** "
-                    f"saved {meta_info.get('saved_at', '')[:16].replace('T', ' ')}")
-            use_saved = st.button("↩️ Load last session", width='stretch')
+        # Offer to reload the last saved session if nothing is uploaded
+        use_saved = False
+        if not uploaded:
+            meta_info = storage.session_meta()
+            if meta_info:
+                st.info(f"Last session: **{meta_info.get('rows', '?')} rows** "
+                        f"saved {meta_info.get('saved_at', '')[:16].replace('T', ' ')}")
+                use_saved = st.button("↩️ Load last session", width='stretch')
 
-    st.divider()
-    st.subheader("Filters")
-    exclude_nonequity = st.toggle("Equity only (remove mutual funds & bonds)", value=False,
-                                  help="Drops mutual funds and bonds/NCDs from the entire dashboard.")
+        st.divider()
+        exclude_nonequity = st.toggle("Equity only (remove funds & bonds)", value=False,
+                                      help="Drops mutual funds and bonds/NCDs from the entire dashboard.")
+        load_meta = st.toggle("Sectors, targets & fundamentals", value=True,
+                              help="One Yahoo Finance .info call per stock. Slower on first load, cached 1 hour.")
+        load_ta = st.toggle("Technical analysis (SMA / RSI)", value=False,
+                            help="Bulk-downloads price history. ~10s first load, cached 1 hour.")
+        load_div = st.toggle("Dividend data", value=False,
+                             help="Fetches dividend history per stock for the Dividends section.")
 
-    st.divider()
-    st.subheader("Data options")
-    load_meta = st.toggle("Sector, names, analyst targets & fundamentals", value=True,
-                          help="One Yahoo Finance .info call per stock. Slower on first load, cached 1 hour.")
-    load_ta = st.toggle("Technical analysis (SMA / RSI)", value=False,
-                        help="Bulk-downloads price history. ~10s first load, cached 1 hour.")
-    load_div = st.toggle("Dividend data", value=False,
-                         help="Fetches dividend history per stock for the Dividends tab.")
+        if st.button("🔄 Refresh data (clear cache)", width='stretch'):
+            for fn in (md.fetch_quotes, md.fetch_metadata, md.fetch_ta_signals,
+                       md.fetch_dividends, md.fetch_closes):
+                fn.clear()
+            st.rerun()
 
-    st.divider()
-    if st.button("🔄 Refresh data (clear cache & retry)", width='stretch'):
-        for fn in (md.fetch_quotes, md.fetch_metadata, md.fetch_ta_signals,
-                   md.fetch_dividends, md.fetch_closes):
-            fn.clear()
-        st.rerun()
-    st.caption("Use if prices, signals, or targets look stale or empty (Yahoo rate-limits large portfolios).")
-
-    with st.expander("Supported formats"):
+    with st.expander("📁 Supported formats"):
         st.markdown("""
 | Broker | How to export |
 |--------|--------------|
@@ -328,19 +375,7 @@ failed_tickers = [t for t in yahoo_tickers if prices.get(t) is None]
 non_yahoo = [t for t in tickers_tuple if t not in yahoo_eligible]
 has_cost_basis = "avg_cost" in raw.columns and raw["avg_cost"].notna().any()
 
-# ─── Summary cards (always visible) ──────────────────────────────────────────
-
-c1, c2, c3, c4, c5, c6 = st.columns(6)
-c1.metric("Total Value", fmt_inr(totals["value"], short=True))
-c2.metric("Total Gain/Loss",
-          fmt_inr(totals["pnl"], short=True) if has_cost_basis else "—",
-          fmt_pct(totals["pnl_pct"]) if has_cost_basis else None)
-c3.metric("Today's Change",
-          fmt_inr(day_chg_total, short=True) if day_chg_total else "—",
-          fmt_pct(day_chg_pct) if day_chg_pct is not None else None)
-c4.metric("Holdings", totals["n_holdings"])
-c5.metric("Accounts", n_accounts)
-c6.metric("Live prices", f"{len(yahoo_eligible) - len(failed_tickers)}/{len(tickers_tuple)}")
+# ─── Global notices (shown above the selected section) ───────────────────────
 
 if not has_cost_basis:
     st.info("ℹ️ This file has **no cost basis** (it omits buy price), so Gain/Loss, tax, and XIRR can't be "
@@ -368,11 +403,7 @@ if failed_tickers:
     with st.expander(f"⚠️ {len(failed_tickers)} ticker(s) not priced by Yahoo — set a manual price in Holdings"):
         st.write(", ".join(failed_tickers))
 
-# ─── Tabs ─────────────────────────────────────────────────────────────────────
-
-tab_names = ["📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical", "🎯 Analysts",
-             "🧮 Tax", "⚠️ Risk", "💰 Dividends", "🔍 Stock Detail", "👁️ Watchlist", "⚖️ Rebalance"]
-tabs = st.tabs(tab_names)
+# ─── Sections (chosen from the sidebar nav; `section` is set in the sidebar) ──
 
 # Shared filtered view (account filter lives in Holdings, but Overview shows all)
 chart_data = holdings.dropna(subset=["Current Value (₹)"])
@@ -380,7 +411,31 @@ chart_data = chart_data[chart_data["Current Value (₹)"] > 0]
 
 
 # ═══ OVERVIEW ═════════════════════════════════════════════════════════════════
-with tabs[0]:
+if section == "📊 Overview":
+    # Hero — centred portfolio value
+    if has_cost_basis:
+        _pc = GAIN if (totals["pnl"] or 0) >= 0 else LOSS
+        _pnl_html = f'<span style="color:{_pc}">{fmt_inr(totals["pnl"])} P&L ({fmt_pct(totals["pnl_pct"])})</span>'
+        _sub = f'{fmt_inr(totals["cost"])} invested · cost basis'
+    else:
+        _pnl_html = '<span class="hero-pnl-muted">cost basis unavailable</span>'
+        _sub = f'{totals["n_holdings"]} holdings · {n_accounts} account(s)'
+    st.markdown(
+        '<div class="hero">'
+        '<div class="hero-label">PORTFOLIO VALUE</div>'
+        f'<div class="hero-value">{fmt_inr(totals["value"])}</div>'
+        f'<div class="hero-pnl">{_pnl_html}</div>'
+        f'<div class="hero-sub">{_sub}</div>'
+        '</div>', unsafe_allow_html=True)
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Today's Change", fmt_inr(day_chg_total, short=True) if day_chg_total else "—",
+              fmt_pct(day_chg_pct) if day_chg_pct is not None else None)
+    k2.metric("Holdings", totals["n_holdings"])
+    k3.metric("Accounts", n_accounts)
+    k4.metric("Live prices", f"{len(yahoo_eligible) - len(failed_tickers)}/{len(tickers_tuple)}")
+    st.divider()
+
     st.subheader("Portfolio Heatmap")
     st.caption("Box size = position value · colour = gain/loss %. Grouped by sector.")
     fig = charts.treemap(holdings)
@@ -428,7 +483,7 @@ with tabs[0]:
 
 
 # ═══ HOLDINGS ═════════════════════════════════════════════════════════════════
-with tabs[1]:
+elif section == "📋 Holdings":
     st.subheader("Holdings")
 
     fc1, fc2, fc3 = st.columns([2, 2, 2])
@@ -563,7 +618,7 @@ with tabs[1]:
 
 
 # ═══ PERFORMANCE ══════════════════════════════════════════════════════════════
-with tabs[2]:
+elif section == "📈 Performance":
     st.subheader("Performance Over Time")
 
     snap_df = storage.snapshots_df()
@@ -641,7 +696,7 @@ with tabs[2]:
 
 
 # ═══ TECHNICAL ════════════════════════════════════════════════════════════════
-with tabs[3]:
+elif section == "🔬 Technical":
     st.subheader("Technical Analysis")
     if not load_ta:
         st.info("Enable **Technical analysis** in the sidebar to load SMA/RSI signals.")
@@ -673,7 +728,7 @@ with tabs[3]:
 
 
 # ═══ ANALYSTS ═════════════════════════════════════════════════════════════════
-with tabs[4]:
+elif section == "🎯 Analysts":
     st.subheader("Analyst Price Targets")
     if not load_meta:
         st.info("Enable **Analyst targets & fundamentals** in the sidebar.")
@@ -728,7 +783,7 @@ with tabs[4]:
 
 
 # ═══ TAX ══════════════════════════════════════════════════════════════════════
-with tabs[5]:
+elif section == "🧮 Tax":
     st.subheader("Capital Gains Tax (if sold today)")
     st.caption("⚠️ **Estimate only — not tax advice.** Indian listed-equity rates (post-Jul 2024): "
                "LTCG 12.5% above ₹1.25 L/yr exemption · STCG 20%. Long-term = held >12 months. "
@@ -773,7 +828,7 @@ with tabs[5]:
 
 
 # ═══ RISK ═════════════════════════════════════════════════════════════════════
-with tabs[6]:
+elif section == "⚠️ Risk":
     st.subheader("Risk & Concentration")
     rm = analytics.risk_metrics(holdings, fundamentals if load_meta else None)
     if not rm:
@@ -816,7 +871,7 @@ with tabs[6]:
 
 
 # ═══ DIVIDENDS ════════════════════════════════════════════════════════════════
-with tabs[7]:
+elif section == "💰 Dividends":
     st.subheader("Dividend Income")
     if not load_div:
         st.info("Enable **Dividend data** in the sidebar to load dividend history.")
@@ -862,7 +917,7 @@ with tabs[7]:
 
 
 # ═══ STOCK DETAIL ═════════════════════════════════════════════════════════════
-with tabs[8]:
+elif section == "🔍 Stock Detail":
     st.subheader("Stock Detail")
     # Only stocks with live Yahoo data have charts/news/fundamentals
     detail_options = [t for t in holdings["Ticker"].tolist() if t in yahoo_eligible]
@@ -947,7 +1002,7 @@ with tabs[8]:
 
 
 # ═══ WATCHLIST ════════════════════════════════════════════════════════════════
-with tabs[9]:
+elif section == "👁️ Watchlist":
     st.subheader("Watchlist")
     st.caption("Track stocks you don't own yet. Saved locally in `data/watchlist.json`.")
     wc1, wc2 = st.columns([3, 1])
@@ -990,7 +1045,7 @@ with tabs[9]:
 
 
 # ═══ REBALANCE ════════════════════════════════════════════════════════════════
-with tabs[10]:
+elif section == "⚖️ Rebalance":
     st.subheader("Rebalancing")
     st.caption("Set target weights for your holdings; see the drift and the ₹ to buy/sell to hit them. "
                "Defaults to your current weights — edit the **Target %** column.")

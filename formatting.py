@@ -4,19 +4,25 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-# ─── Colours & labels ─────────────────────────────────────────────────────────
+# ─── Theme palette (dark, champagne-gold accent) ──────────────────────────────
 
-GAIN = "#2ecc71"
-LOSS = "#e74c3c"
-MUTED = "#95a5a6"
+GOLD = "#C9A87A"      # primary accent — brand, hero value, chart lines
+GAIN = "#3DDC97"      # positive (mint green)
+LOSS = "#F0564A"      # negative (coral red)
+BG = "#0A0A0A"        # app background
+SURFACE = "#141414"   # cards / panels
+BORDER = "#262626"    # card borders / dividers
+TEXT = "#EDEDED"      # primary text
+MUTED = "#8B8B8B"     # secondary / labels
+GRID = "#1F1F1F"      # chart gridlines
 
 SIGNAL_ORDER = ["Strong Bullish", "Bullish", "Neutral", "Bearish", "Strong Bearish", "N/A"]
 SIGNAL_COLOR = {
-    "Strong Bullish": "#1a7a4a",
-    "Bullish":        "#2ecc71",
-    "Neutral":        "#95a5a6",
-    "Bearish":        "#e74c3c",
-    "Strong Bearish": "#922b21",
+    "Strong Bullish": "#1f9e6b",
+    "Bullish":        GAIN,
+    "Neutral":        MUTED,
+    "Bearish":        LOSS,
+    "Strong Bearish": "#a8362c",
     "N/A":            "#555555",
 }
 
@@ -28,11 +34,11 @@ REC_LABEL = {
     "sell":         "Sell",
 }
 REC_COLOR = {
-    "Strong Buy":   "#1a7a4a",
-    "Buy":          "#2ecc71",
-    "Hold":         "#f39c12",
-    "Underperform": "#e74c3c",
-    "Sell":         "#922b21",
+    "Strong Buy":   "#1f9e6b",
+    "Buy":          GAIN,
+    "Hold":         GOLD,
+    "Underperform": LOSS,
+    "Sell":         "#a8362c",
     "—":            "#555555",
 }
 

@@ -5,10 +5,31 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 
-from formatting import SIGNAL_COLOR, REC_COLOR, GAIN, LOSS
+from formatting import SIGNAL_COLOR, REC_COLOR, GAIN, LOSS, GOLD, MUTED, TEXT, BORDER, GRID
 
 _MARGIN = dict(t=50, b=10, l=10, r=10)
+_FONT = "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+
+# Muted, on-brand qualitative palette (gold → green → teal → mauve → …)
+_SEQ = [GOLD, GAIN, "#5BC0BE", "#B08FB0", "#D9A066", "#6FA8DC",
+        "#C97A7A", "#8FB08F", "#A0826D", "#7AA5C9", "#C9B07A", "#9AA0A6"]
+
+# Global dark theme applied to every figure (transparent bg, Inter font, muted grid)
+_tmpl = go.layout.Template()
+_tmpl.layout = go.Layout(
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family=_FONT, color=TEXT, size=13),
+    title=dict(font=dict(family=_FONT, color=TEXT, size=15)),
+    colorway=_SEQ,
+    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID, linecolor=BORDER, tickfont=dict(color=MUTED)),
+    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID, linecolor=BORDER, tickfont=dict(color=MUTED)),
+    legend=dict(font=dict(color=MUTED)),
+    hoverlabel=dict(font=dict(family=_FONT)),
+)
+pio.templates["portfolio"] = _tmpl
+pio.templates.default = "portfolio"
 
 
 # ─── Allocation ───────────────────────────────────────────────────────────────
@@ -26,7 +47,7 @@ def pie_by_stock(chart_data: pd.DataFrame, top_n: int = 12) -> go.Figure | None:
         }])], ignore_index=True)
     fig = px.pie(top, values="Current Value (₹)", names="Ticker",
                  title=f"By Stock (top {min(top_n, len(chart_data))})", hole=0.42,
-                 color_discrete_sequence=px.colors.qualitative.Set3)
+                 color_discrete_sequence=_SEQ)
     fig.update_traces(textposition="inside", textinfo="percent+label")
     fig.update_layout(showlegend=False, margin=_MARGIN)
     return fig
@@ -38,7 +59,7 @@ def pie_by_sector(chart_data: pd.DataFrame) -> go.Figure | None:
     grp = (chart_data.groupby("Sector")["Current Value (₹)"].sum()
            .reset_index().sort_values("Current Value (₹)", ascending=False))
     fig = px.pie(grp, values="Current Value (₹)", names="Sector", title="By Sector",
-                 hole=0.42, color_discrete_sequence=px.colors.qualitative.Pastel)
+                 hole=0.42, color_discrete_sequence=_SEQ)
     fig.update_traces(textposition="inside", textinfo="percent+label")
     fig.update_layout(showlegend=True, margin=_MARGIN)
     return fig
@@ -53,7 +74,7 @@ def treemap(holdings: pd.DataFrame) -> go.Figure | None:
     fig = px.treemap(
         data, path=[px.Constant("Portfolio"), "Sector", "Ticker"],
         values="Current Value (₹)", color="GL%",
-        color_continuous_scale=["#922b21", "#e74c3c", "#2c3e50", "#2ecc71", "#1a7a4a"],
+        color_continuous_scale=["#a8362c", LOSS, "#2a2a2a", GAIN, "#1f9e6b"],
         color_continuous_midpoint=0, range_color=[-30, 30],
         custom_data=["Gain/Loss (%)", "Current Value (₹)"],
     )
@@ -72,7 +93,7 @@ def account_stacked(bar_data: pd.DataFrame) -> go.Figure | None:
         return None
     fig = px.bar(bar_data, x="Account", y="Value", color="Ticker",
                  title="Holdings by Account", labels={"Value": "Current Value (₹)"},
-                 color_discrete_sequence=px.colors.qualitative.Set3)
+                 color_discrete_sequence=_SEQ)
     fig.update_layout(legend=dict(orientation="h", y=-0.2))
     return fig
 
@@ -154,8 +175,8 @@ def snapshot_line(snap_df: pd.DataFrame) -> go.Figure | None:
         return None
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=snap_df["date"], y=snap_df["Total Value"], mode="lines+markers",
-                             name="Portfolio Value", line=dict(color="#3498db", width=2.5),
-                             fill="tozeroy", fillcolor="rgba(52,152,219,0.1)"))
+                             name="Portfolio Value", line=dict(color=GOLD, width=2.5),
+                             fill="tozeroy", fillcolor="rgba(201,168,122,0.12)"))
     if snap_df["Total Cost"].notna().any():
         fig.add_trace(go.Scatter(x=snap_df["date"], y=snap_df["Total Cost"], mode="lines",
                                  name="Invested (cost)", line=dict(color=GAIN, width=1.5, dash="dot")))
@@ -170,10 +191,10 @@ def benchmark_overlay(port_norm: pd.Series, bench_norm: pd.Series, bench_name: s
         return None
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=port_norm.index, y=port_norm.values, mode="lines",
-                             name="My Portfolio", line=dict(color="#3498db", width=2.5)))
+                             name="My Portfolio", line=dict(color=GOLD, width=2.5)))
     if not bench_norm.empty:
         fig.add_trace(go.Scatter(x=bench_norm.index, y=bench_norm.values, mode="lines",
-                                 name=bench_name, line=dict(color="#e67e22", width=2, dash="dash")))
+                                 name=bench_name, line=dict(color="#7AA5C9", width=2, dash="dash")))
     fig.add_hline(y=100, line_dash="dot", line_color="white", opacity=0.3)
     fig.update_layout(title=f"Portfolio vs {bench_name} (rebased to 100)", height=420,
                       margin=dict(t=50, b=20, l=10, r=10), yaxis_title="Indexed (start = 100)",
@@ -188,14 +209,15 @@ def candlestick(hist: pd.DataFrame, ticker: str, avg_cost: float | None = None) 
         return None
     fig = go.Figure()
     fig.add_trace(go.Candlestick(x=hist.index, open=hist["Open"], high=hist["High"],
-                                 low=hist["Low"], close=hist["Close"], name=ticker))
+                                 low=hist["Low"], close=hist["Close"], name=ticker,
+                                 increasing_line_color=GAIN, decreasing_line_color=LOSS))
     close = hist["Close"]
     if len(close) >= 50:
         fig.add_trace(go.Scatter(x=hist.index, y=close.rolling(50).mean(), name="SMA 50",
-                                 line=dict(color="#f39c12", width=1.2)))
+                                 line=dict(color=GOLD, width=1.2)))
     if len(close) >= 200:
         fig.add_trace(go.Scatter(x=hist.index, y=close.rolling(200).mean(), name="SMA 200",
-                                 line=dict(color="#9b59b6", width=1.2)))
+                                 line=dict(color="#9AA0A6", width=1.2)))
     if avg_cost and not pd.isna(avg_cost):
         fig.add_hline(y=avg_cost, line_dash="dash", line_color=GAIN, opacity=0.7,
                       annotation_text=f"Avg cost ₹{avg_cost:,.0f}", annotation_position="bottom right")
@@ -213,7 +235,7 @@ def wk52_gauge(price: float, low: float, high: float) -> go.Figure | None:
         mode="gauge+number", value=price, number={"prefix": "₹", "valueformat": ",.0f"},
         title={"text": f"52-week range · {pct:.0f}% of band"},
         gauge={"axis": {"range": [low, high]},
-               "bar": {"color": "#3498db"},
+               "bar": {"color": GOLD},
                "steps": [{"range": [low, low + (high - low) * 0.33], "color": "rgba(231,76,60,0.3)"},
                          {"range": [low + (high - low) * 0.33, low + (high - low) * 0.66], "color": "rgba(149,165,166,0.3)"},
                          {"range": [low + (high - low) * 0.66, high], "color": "rgba(46,204,113,0.3)"}]}))
