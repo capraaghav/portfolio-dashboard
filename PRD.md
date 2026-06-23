@@ -1,7 +1,6 @@
 # Product Requirements Document — Portfolio Dashboard
 
 | | |
-|---|---|
 | **Product** | Portfolio Dashboard — unified stock-portfolio analytics for Indian markets (NSE/BSE) |
 | **Document version** | 1.0 |
 | **Status** | Live (shipped) |
