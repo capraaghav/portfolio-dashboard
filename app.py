@@ -139,6 +139,7 @@ if USE_DB:
     if not db.current_user():
         db.render_auth()
         st.stop()
+    db.persist_cookie()   # (re)write the refresh-token cookie each logged-in run
 
 def _is_multiuser() -> bool:
     if os.getenv("PORTFOLIO_MULTIUSER") == "1":

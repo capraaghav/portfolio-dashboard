@@ -85,26 +85,38 @@ def _clear_cookie() -> None:
             pass
 
 
+def _read_cookie() -> str | None:
+    """Read the refresh-token cookie natively from the page-load request headers.
+    Unlike the component's get_all() round-trip, this is available immediately on the
+    first run after a reload (Streamlit 1.42+), so there's no login flash and no
+    dependence on a follow-up rerun."""
+    try:
+        return st.context.cookies.get(_COOKIE)
+    except Exception:
+        return None
+
+
+def persist_cookie() -> None:
+    """(Re)write the refresh-token cookie on every logged-in run. Doing it on a normal
+    run — rather than only at the login click, which is immediately followed by a
+    rerun that can drop the component's write — guarantees the cookie actually lands."""
+    sess = st.session_state.get("sb_session")
+    if sess and sess.get("refresh_token"):
+        _set_cookie(sess["refresh_token"])
+
+
 def restore_session() -> None:
     """If we're not logged in this session but a refresh-token cookie exists (e.g.
-    after a browser refresh, which wipes st.session_state), re-authenticate from it.
-    The cookie component delivers its value via a rerun, so the first run after a
-    refresh may no-op and restore on the next run (a brief login flash)."""
+    after a browser refresh, which wipes st.session_state), re-authenticate from it."""
     if current_user():
         return
-    mgr = _cookie_mgr()
-    if mgr is None:
-        return
-    try:
-        token = (mgr.get_all(key="sb_ck_all") or {}).get(_COOKIE)
-    except Exception:
-        token = None
+    token = _read_cookie()
     if not token:
         return
     try:
         res = _client().auth.refresh_session(token)
         if res and getattr(res, "session", None):
-            _store_session(res)          # rotates + re-saves the cookie
+            _store_session(res)          # rotates the token; persist_cookie re-saves it
     except Exception:
         _clear_cookie()                  # token expired/invalid — drop it
 
@@ -128,7 +140,6 @@ def _store_session(res) -> None:
             "refresh_token": res.session.refresh_token,
         }
         st.session_state["sb_user"] = {"id": res.user.id, "email": res.user.email}
-        _set_cookie(res.session.refresh_token)
 
 
 def sign_in(email: str, password: str) -> tuple[bool, str | None]:
