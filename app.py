@@ -18,6 +18,7 @@ import streamlit as st
 
 import analytics
 import charts
+import db
 import market_data as md
 import parsers
 import storage
@@ -125,11 +126,17 @@ _SKELETON = f"""
 # Global click-spark effect (gold sparks radiate from every click)
 click_spark(spark_color="#C9A87A", spark_size=13, spark_radius=30, spark_count=9, duration=400)
 
-# ─── Multi-user / hosting isolation ──────────────────────────────────────────
-# When hosted for several people (set PORTFOLIO_MULTIUSER=1 as an env var or in
-# Streamlit Cloud secrets), give each browser session its own private temp folder
-# so no visitor can see another's saved holdings, snapshots, watchlist or overrides.
-# Locally (default) it uses the persistent ./data folder as before.
+# ─── Backend: Supabase accounts (if configured) else local files ─────────────
+# When SUPABASE_URL + SUPABASE_ANON_KEY are in secrets, the app requires login and
+# stores each user's portfolio/snapshots/watchlist privately in Supabase. Otherwise
+# it behaves exactly as before (local files, with optional per-session isolation).
+
+USE_DB = db.is_enabled()
+store = db if USE_DB else storage
+
+if USE_DB and not db.current_user():
+    db.render_auth()
+    st.stop()
 
 def _is_multiuser() -> bool:
     if os.getenv("PORTFOLIO_MULTIUSER") == "1":
@@ -139,7 +146,7 @@ def _is_multiuser() -> bool:
     except Exception:
         return False
 
-MULTIUSER = _is_multiuser()
+MULTIUSER = (not USE_DB) and _is_multiuser()
 if MULTIUSER:
     if "_sid" not in st.session_state:
         st.session_state["_sid"] = uuid.uuid4().hex[:12]
@@ -148,9 +155,9 @@ if MULTIUSER:
 # ─── Session state ────────────────────────────────────────────────────────────
 
 if "overrides" not in st.session_state:
-    st.session_state.overrides = storage.load_overrides()
+    st.session_state.overrides = store.load_overrides()
 if "watchlist" not in st.session_state:
-    st.session_state.watchlist = storage.load_watchlist()
+    st.session_state.watchlist = store.load_watchlist()
 
 
 def _wk52_pct(ticker, prices_map, fund_map):
@@ -186,6 +193,13 @@ SECTIONS = ["📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technica
 with st.sidebar:
     st.markdown('<div class="brand-title">PORTFOLIO</div>'
                 '<div class="brand-sub">Indian Markets · NSE / BSE</div>', unsafe_allow_html=True)
+    if USE_DB:
+        _u = db.current_user()
+        c_acc, c_out = st.columns([3, 1])
+        c_acc.caption(f"👤 {_u['email']}" if _u else "")
+        if c_out.button("Log out", key="logout"):
+            db.sign_out()
+            st.rerun()
     section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
     st.divider()
 
@@ -205,7 +219,7 @@ with st.sidebar:
         # Offer to reload the last saved session if nothing is uploaded
         use_saved = False
         if not uploaded:
-            meta_info = storage.session_meta()
+            meta_info = store.session_meta()
             if meta_info:
                 st.info(f"Last session: **{meta_info.get('rows', '?')} rows** "
                         f"saved {meta_info.get('saved_at', '')[:16].replace('T', ' ')}")
@@ -245,7 +259,9 @@ Files that store a full **company name** or only an **ISIN** instead of a ticker
 are auto-matched to NSE/BSE symbols (the file's own LTP disambiguates look-alikes;
 unknown names fall back to the NSE official list, then a web search).
         """)
-    if MULTIUSER:
+    if USE_DB:
+        st.caption("🔒 Saved privately to your account (Supabase). Only you can see your data.")
+    elif MULTIUSER:
         st.caption("🔒 Your upload is processed in a private session and is **not stored** after you "
                    "leave. Other visitors can't see your data.")
     else:
@@ -259,13 +275,13 @@ if uploaded:
     for fname, err in parse_errors:
         st.error(f"**`{fname}`** — {err}")
     if raw is not None:
-        storage.save_session(raw)
+        store.save_session(raw)
     st.session_state["_use_saved"] = False
 elif use_saved or st.session_state.get("_use_saved"):
     # Keep the loaded session across reruns (the button is one-shot) so filters/
     # interactions don't drop the data.
     st.session_state["_use_saved"] = True
-    raw = storage.load_session()
+    raw = store.load_session()
 
 if raw is None or raw.empty:
     st.markdown("## Welcome to your Portfolio Dashboard")
@@ -414,7 +430,7 @@ day_chg_pct = (day_chg_total / prev_val_total * 100) if prev_val_total > 0 else 
 
 # Auto-save a daily snapshot (silently, once per day)
 try:
-    storage.auto_snapshot_if_new(totals, holdings)
+    store.auto_snapshot_if_new(totals, holdings)
 except Exception:
     pass
 
@@ -683,7 +699,7 @@ elif section == "📋 Holdings":
                 for _, r in edited.iterrows():
                     if r["Your Price (₹)"] and r["Your Price (₹)"] > 0:
                         st.session_state.overrides[r["Ticker"]] = float(r["Your Price (₹)"])
-                storage.save_overrides(st.session_state.overrides)
+                store.save_overrides(st.session_state.overrides)
                 st.success("Saved. Refreshing…")
                 st.rerun()
 
@@ -692,11 +708,11 @@ elif section == "📋 Holdings":
 elif section == "📈 Performance":
     st.subheader("Performance Over Time")
 
-    snap_df = storage.snapshots_df()
+    snap_df = store.snapshots_df()
     sc1, sc2 = st.columns([3, 1])
     with sc2:
         if st.button("📸 Save snapshot now", width='stretch'):
-            storage.save_snapshot(totals, holdings)
+            store.save_snapshot(totals, holdings)
             st.success("Snapshot saved!")
             st.rerun()
         st.caption(f"{len(snap_df)} snapshot(s) saved.")
@@ -1086,7 +1102,7 @@ elif section == "👁️ Watchlist":
                 tt = t.strip().upper()
                 if tt and tt not in st.session_state.watchlist:
                     st.session_state.watchlist.append(tt)
-            storage.save_watchlist(st.session_state.watchlist)
+            store.save_watchlist(st.session_state.watchlist)
             st.rerun()
 
     if not st.session_state.watchlist:
@@ -1111,7 +1127,7 @@ elif section == "👁️ Watchlist":
         rm_t = st.selectbox("Remove ticker", ["—"] + list(wl))
         if rm_t != "—" and st.button("Remove"):
             st.session_state.watchlist.remove(rm_t)
-            storage.save_watchlist(st.session_state.watchlist)
+            store.save_watchlist(st.session_state.watchlist)
             st.rerun()
 
 
