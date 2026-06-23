@@ -134,9 +134,11 @@ click_spark(spark_color="#C9A87A", spark_size=13, spark_radius=30, spark_count=9
 USE_DB = db.is_enabled()
 store = db if USE_DB else storage
 
-if USE_DB and not db.current_user():
-    db.render_auth()
-    st.stop()
+if USE_DB:
+    db.restore_session()  # re-auth from cookie after a browser refresh wipes session_state
+    if not db.current_user():
+        db.render_auth()
+        st.stop()
 
 def _is_multiuser() -> bool:
     if os.getenv("PORTFOLIO_MULTIUSER") == "1":

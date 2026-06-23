@@ -11,10 +11,12 @@ Postgres row-level security keeps each user's rows private.
 
 from __future__ import annotations
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 import streamlit as st
+
+_COOKIE = "sb_refresh"  # browser cookie that survives a full page refresh
 
 
 # ─── Config / client ──────────────────────────────────────────────────────────
@@ -48,6 +50,65 @@ def _client():
     return st.session_state.sb
 
 
+# ─── Cookie (keeps you logged in across a full browser refresh) ───────────────
+
+def _cookie_mgr():
+    """One CookieManager per session, memoised in session_state (NOT cache_resource,
+    which Streamlit forbids around widgets, and constructed once so there's no
+    DuplicateWidgetID). Returns None if the optional component isn't installed —
+    login then simply won't survive a hard refresh (the pre-cookie behaviour)."""
+    if "_sb_ckmgr" not in st.session_state:
+        try:
+            import extra_streamlit_components as stx
+            st.session_state["_sb_ckmgr"] = stx.CookieManager(key="sb_ck_init")
+        except Exception:
+            return None
+    return st.session_state.get("_sb_ckmgr")
+
+
+def _set_cookie(refresh_token: str | None) -> None:
+    mgr = _cookie_mgr()
+    if mgr is not None and refresh_token:
+        try:
+            mgr.set(_COOKIE, refresh_token,
+                    expires_at=datetime.now() + timedelta(days=30), key="sb_ck_set")
+        except Exception:
+            pass
+
+
+def _clear_cookie() -> None:
+    mgr = _cookie_mgr()
+    if mgr is not None:
+        try:
+            mgr.delete(_COOKIE, key="sb_ck_del")  # raises KeyError if already absent
+        except Exception:
+            pass
+
+
+def restore_session() -> None:
+    """If we're not logged in this session but a refresh-token cookie exists (e.g.
+    after a browser refresh, which wipes st.session_state), re-authenticate from it.
+    The cookie component delivers its value via a rerun, so the first run after a
+    refresh may no-op and restore on the next run (a brief login flash)."""
+    if current_user():
+        return
+    mgr = _cookie_mgr()
+    if mgr is None:
+        return
+    try:
+        token = (mgr.get_all(key="sb_ck_all") or {}).get(_COOKIE)
+    except Exception:
+        token = None
+    if not token:
+        return
+    try:
+        res = _client().auth.refresh_session(token)
+        if res and getattr(res, "session", None):
+            _store_session(res)          # rotates + re-saves the cookie
+    except Exception:
+        _clear_cookie()                  # token expired/invalid — drop it
+
+
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
 def current_user() -> dict | None:
@@ -67,6 +128,7 @@ def _store_session(res) -> None:
             "refresh_token": res.session.refresh_token,
         }
         st.session_state["sb_user"] = {"id": res.user.id, "email": res.user.email}
+        _set_cookie(res.session.refresh_token)
 
 
 def sign_in(email: str, password: str) -> tuple[bool, str | None]:
@@ -96,6 +158,7 @@ def sign_out() -> None:
         _client().auth.sign_out()
     except Exception:
         pass
+    _clear_cookie()
     for k in ("sb", "sb_session", "sb_user"):
         st.session_state.pop(k, None)
 
