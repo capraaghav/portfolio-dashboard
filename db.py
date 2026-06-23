@@ -173,8 +173,9 @@ def sign_in(email: str, password: str) -> tuple[str, str | None]:
         if res.user and (res.user.user_metadata or {}).get("twofa_email"):
             # Password is valid, but this account requires a second factor. Don't grant
             # access yet — email a one-time code and wait for verify_email_otp().
-            if not _send_email_otp(email):
-                return "error", "Couldn't send the email code — try again in a minute."
+            sent, otp_err = _send_email_otp(email)
+            if not sent:
+                return "error", otp_err or "Couldn't send the email code — try again in a minute."
             st.session_state["_2fa_email"] = email
             return "2fa", None
         _store_session(res)
@@ -183,17 +184,18 @@ def sign_in(email: str, password: str) -> tuple[str, str | None]:
         return "error", _friendly(e)
 
 
-def _send_email_otp(email: str) -> bool:
-    """Email a 6-digit one-time code to an existing user (no new account)."""
+def _send_email_otp(email: str) -> tuple[bool, str | None]:
+    """Email a 6-digit one-time code to an existing user (no new account).
+    Returns (sent, error) so the real Supabase reason (rate limit, SMTP, etc.) surfaces."""
     try:
         _client().auth.sign_in_with_otp(
             {"email": email.strip(), "options": {"should_create_user": False}})
-        return True
-    except Exception:
-        return False
+        return True, None
+    except Exception as e:
+        return False, _friendly(e)
 
 
-def resend_email_otp(email: str) -> bool:
+def resend_email_otp(email: str) -> tuple[bool, str | None]:
     return _send_email_otp(email)
 
 
@@ -249,12 +251,20 @@ def sign_out() -> None:
 
 def _friendly(e: Exception) -> str:
     msg = str(e)
+    low = msg.lower()
     if "Invalid login" in msg:
         return "Invalid email or password."
-    if "already registered" in msg.lower():
+    if "already registered" in low:
         return "That email is already registered — log in instead."
     if "Password should be" in msg:
         return "Password too short (min 6 characters)."
+    if "rate limit" in low or "after" in low and "second" in low:
+        return ("Email rate limit hit (Supabase's built-in email is throttled). "
+                "Wait a minute, or set up custom SMTP to remove the limit.")
+    if "otp" in low and "disabled" in low or "signups not allowed" in low:
+        return "Email codes aren't enabled for this project (check Auth settings)."
+    if "smtp" in low or "error sending" in low:
+        return "The email couldn't be sent — configure SMTP in Supabase Auth settings."
     return msg
 
 
@@ -305,8 +315,8 @@ def _render_2fa_step() -> None:
             st.error(err)
     c1, c2 = st.columns(2)
     if c1.button("Resend code", width="stretch", key="twofa_resend"):
-        (st.success("New code sent.") if resend_email_otp(email)
-         else st.error("Couldn't resend — wait a minute and try again."))
+        sent, err = resend_email_otp(email)
+        st.success("New code sent.") if sent else st.error(err or "Couldn't resend — wait a minute.")
     if c2.button("← Back", width="stretch", key="twofa_back"):
         st.session_state.pop("_2fa_email", None)
         st.rerun()
