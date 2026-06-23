@@ -207,6 +207,19 @@ with st.sidebar:
             # holdings) so the next person to log in on this browser starts clean.
             st.session_state.clear()
             st.rerun()
+        with st.expander("🔐 Security"):
+            _2fa_on = db.twofa_enabled()
+            _want = st.toggle("Require email code at login (2FA)", value=_2fa_on,
+                              key="twofa_toggle",
+                              help="Adds a one-time code, emailed each time you log in, "
+                                   "on top of your password.")
+            if _want != _2fa_on:
+                ok, err = db.set_twofa(_want)
+                if ok:
+                    st.success(("Two-factor enabled." if _want else "Two-factor disabled."))
+                    st.rerun()
+                else:
+                    st.error(err)
     section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
     st.divider()
 

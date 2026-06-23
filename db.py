@@ -155,15 +155,73 @@ def _store_session(res) -> None:
             "refresh_token": res.session.refresh_token,
         }
         st.session_state["sb_user"] = {"id": res.user.id, "email": res.user.email}
+        # 2FA preference lives in the user's own Supabase metadata (no table change).
+        st.session_state["sb_2fa"] = bool((res.user.user_metadata or {}).get("twofa_email"))
 
 
-def sign_in(email: str, password: str) -> tuple[bool, str | None]:
+def sign_in(email: str, password: str) -> tuple[str, str | None]:
+    """Validate the password. Returns (status, error):
+      'ok'    — logged in (no 2FA),
+      '2fa'   — password correct but email 2FA is on; a code has been emailed,
+      'error' — bad credentials / failure.
+    """
+    email = email.strip()
     try:
-        res = _client().auth.sign_in_with_password({"email": email.strip(), "password": password})
+        res = _client().auth.sign_in_with_password({"email": email, "password": password})
+        if not (res and res.session):
+            return "error", "Login failed — check your email and password."
+        if res.user and (res.user.user_metadata or {}).get("twofa_email"):
+            # Password is valid, but this account requires a second factor. Don't grant
+            # access yet — email a one-time code and wait for verify_email_otp().
+            if not _send_email_otp(email):
+                return "error", "Couldn't send the email code — try again in a minute."
+            st.session_state["_2fa_email"] = email
+            return "2fa", None
+        _store_session(res)
+        return "ok", None
+    except Exception as e:
+        return "error", _friendly(e)
+
+
+def _send_email_otp(email: str) -> bool:
+    """Email a 6-digit one-time code to an existing user (no new account)."""
+    try:
+        _client().auth.sign_in_with_otp(
+            {"email": email.strip(), "options": {"should_create_user": False}})
+        return True
+    except Exception:
+        return False
+
+
+def resend_email_otp(email: str) -> bool:
+    return _send_email_otp(email)
+
+
+def verify_email_otp(email: str, token: str) -> tuple[bool, str | None]:
+    """Second factor: verify the emailed code and complete login."""
+    try:
+        res = _client().auth.verify_otp(
+            {"email": email.strip(), "token": (token or "").strip(), "type": "email"})
         if res and res.session:
             _store_session(res)
+            st.session_state.pop("_2fa_email", None)
             return True, None
-        return False, "Login failed — check your email and password."
+        return False, "Invalid or expired code."
+    except Exception as e:
+        return False, _friendly(e)
+
+
+def twofa_enabled() -> bool:
+    """Whether the logged-in user requires an email code at login."""
+    return bool(st.session_state.get("sb_2fa"))
+
+
+def set_twofa(enabled: bool) -> tuple[bool, str | None]:
+    """Turn email-2FA on/off for the current user (stored in their Supabase metadata)."""
+    try:
+        _client().auth.update_user({"data": {"twofa_email": bool(enabled)}})
+        st.session_state["sb_2fa"] = bool(enabled)
+        return True, None
     except Exception as e:
         return False, _friendly(e)
 
@@ -185,7 +243,7 @@ def sign_out() -> None:
     except Exception:
         pass
     _clear_cookie()
-    for k in ("sb", "sb_session", "sb_user"):
+    for k in ("sb", "sb_session", "sb_user", "sb_2fa", "_2fa_email"):
         st.session_state.pop(k, None)
 
 
@@ -208,14 +266,17 @@ def render_auth() -> None:
         unsafe_allow_html=True)
     _, mid, _ = st.columns([1, 1.4, 1])
     with mid:
+        if st.session_state.get("_2fa_email"):     # mid-login: awaiting the email code
+            _render_2fa_step()
+            return
         tab_login, tab_signup = st.tabs(["Log in", "Sign up"])
         with tab_login:
             e = st.text_input("Email", key="li_email")
             p = st.text_input("Password", type="password", key="li_pw")
             if st.button("Log in", width="stretch", key="li_btn"):
-                ok, err = sign_in(e, p)
-                if ok:
-                    st.rerun()
+                status, err = sign_in(e, p)
+                if status in ("ok", "2fa"):
+                    st.rerun()                      # '2fa' → reruns into the code step
                 else:
                     st.error(err)
         with tab_signup:
@@ -228,6 +289,27 @@ def render_auth() -> None:
                 else:
                     (st.success if "confirm" in (err or "") else st.error)(err)
         st.caption("🔒 Your portfolio is stored privately under your account (row-level security).")
+
+
+def _render_2fa_step() -> None:
+    """Second-factor screen: the user has passed the password and we emailed a code."""
+    email = st.session_state.get("_2fa_email", "")
+    st.info(f"Two-factor: enter the 6-digit code we emailed to **{email}**.")
+    code = st.text_input("Email code", key="twofa_code", max_chars=6,
+                         placeholder="123456")
+    if st.button("Verify & log in", width="stretch", key="twofa_verify"):
+        ok, err = verify_email_otp(email, code)
+        if ok:
+            st.rerun()
+        else:
+            st.error(err)
+    c1, c2 = st.columns(2)
+    if c1.button("Resend code", width="stretch", key="twofa_resend"):
+        (st.success("New code sent.") if resend_email_otp(email)
+         else st.error("Couldn't resend — wait a minute and try again."))
+    if c2.button("← Back", width="stretch", key="twofa_back"):
+        st.session_state.pop("_2fa_email", None)
+        st.rerun()
 
 
 # ─── Per-user storage (mirrors storage.py) ───────────────────────────────────
