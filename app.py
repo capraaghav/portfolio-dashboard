@@ -199,6 +199,9 @@ with st.sidebar:
         c_acc.caption(f"👤 {_u['email']}" if _u else "")
         if c_out.button("Log out", key="logout"):
             db.sign_out()
+            # Wipe all per-user state (watchlist, overrides, uploaded file, cached
+            # holdings) so the next person to log in on this browser starts clean.
+            st.session_state.clear()
             st.rerun()
     section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
     st.divider()
