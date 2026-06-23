@@ -13,9 +13,9 @@ the right target window automatically.
 """
 
 from __future__ import annotations
-import inspect
 import json
 import streamlit as st
+import streamlit.components.v1 as components
 
 _JS = r"""
 <script>
@@ -101,10 +101,10 @@ def click_spark(spark_color: str = "#C9A87A", spark_size: int = 13, spark_radius
     })
     html = _JS.replace("__CFG__", cfg)
 
-    # Prefer the modern st.html(unsafe_allow_javascript=…); fall back to the legacy
-    # components iframe on older Streamlit.
-    if hasattr(st, "html") and "unsafe_allow_javascript" in inspect.signature(st.html).parameters:
-        st.html(html, unsafe_allow_javascript=True)
-    else:
-        import streamlit.components.v1 as components
+    # The components iframe reliably executes its srcdoc script (which then injects the
+    # canvas into window.parent). st.html does NOT reliably run injected <script>, so we
+    # use components.html here; fall back to st.html only if it's ever removed.
+    try:
         components.html(html, height=0)
+    except Exception:
+        st.html(html, unsafe_allow_javascript=True)
