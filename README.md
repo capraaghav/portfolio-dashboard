@@ -9,6 +9,12 @@ Finance for prices/fundamentals — your holdings are never uploaded anywhere.
 
 ---
 
+## Documentation
+
+Full docs live in [`docs/`](docs/README.md) — a getting-started tutorial, how-to guides
+(add a broker, deploy, host the landing page), module/config/broker-format reference, and
+architecture explanations. See also [PRD.md](PRD.md), [DESIGN.md](DESIGN.md), and [DEPLOY.md](DEPLOY.md).
+
 ## Quick start
 
 ```bash
