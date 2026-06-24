@@ -185,155 +185,21 @@ if MULTIUSER:
     storage.configure(Path(tempfile.gettempdir()) / "portfolio_sessions" / st.session_state["_sid"])
 
 
-def render_landing(pre_login: bool = False) -> None:
-    """Landing / welcome screen. Shown to logged-out users (above the auth form) and to
-    logged-in users before they upload. Static HTML on the app's own theme tokens — no JS
-    (Streamlit strips <script>); the animated version lives in standalone index.html."""
-    if USE_DB:
-        _privacy = ("🔒 Stored privately to your account — row-level security means "
-                    "only you can ever see your holdings.")
-    elif MULTIUSER:
-        _privacy = ("🔒 Processed in a private session and never stored after you leave. "
-                    "Other visitors can't see your data.")
-    else:
-        _privacy = ("🔒 Runs entirely on your machine — your holdings never leave your "
-                    "computer. The only outbound calls are to Yahoo Finance for prices.")
-
-    cta = ("↓ Log in or sign up just below to get started." if pre_login
-           else "⚙️ Open Upload / Data in the sidebar to begin ↖")
-
-    _brokers = ["Zerodha", "Groww", "Upstox", "Angel One", "HDFC Securities",
-                "Reliance", "IndusInd", "IIFL"]
-    _chips = "".join(f'<span class="lp-chip">{b}</span>' for b in _brokers)
-
-    # Feature narrative — deliberately varied blocks, not an identical icon-card grid.
-    _features = [
-        ("Lead with the picture",
-         "A treemap heatmap sizes each position by value and colours it by gain/loss, "
-         "with allocation by stock and sector beside it."),
-        ("Performance you can trust",
-         "Daily snapshots build a value timeline, XIRR uses your real purchase dates, and "
-         "a backtest replays your basket against NIFTY 50, SENSEX, Bank Nifty or Midcap."),
-        ("Depth on demand",
-         "Technical signals (SMA / RSI), 12-month analyst targets, LTCG/STCG tax, "
-         "concentration risk and dividend income — each behind a toggle, never dumped at once."),
-        ("Every broker, one view",
-         "CSV, Excel or PDF from any Indian broker — company names and ISINs are auto-matched "
-         "to NSE/BSE tickers, and a stock held in several accounts is consolidated into one row."),
-    ]
-    _feat_html = "".join(
-        f'<div class="lp-feat"><div class="lp-feat-h">{h}</div>'
-        f'<div class="lp-feat-b">{b}</div></div>' for h, b in _features)
-
-    # Sample-dashboard mock ("A glance at the desk") — ported from index.html so the
-    # in-app welcome matches the standalone landing page. Illustrative static data.
-    _tiles = [("RELIANCE", "+12.6%", "up span-3 row-2"), ("HDFCBANK", "+7.1%", "up span-2"),
-              ("WIPRO", "−4.3%", "down"), ("INFY", "+9.8%", "up span-2"),
-              ("PAYTM", "−6.1%", "down"), ("TCS", "+22.4%", "up span-2"),
-              ("ITC", "+3.0%", "up"), ("ZOMATO", "−1.9%", "down span-2"),
-              ("SBIN", "+5.5%", "up")]
-    _tiles_html = "".join(
-        f'<div class="lp-tile {c}"><span class="lp-tsym">{s}</span>'
-        f'<span class="lp-tpnl">{p}</span></div>' for s, p, c in _tiles)
-    _mcards = [("Invested", "₹20,99,480", "+₹3,86,940", "gain"),
-               ("Day change", "₹14,210", "▲ +0.57%", "gain"),
-               ("XIRR", "16.2%", "+4.1% vs NIFTY", "gain"),
-               ("Top-5 weight", "61.4%", "9 effective holdings", "muted")]
-    _mcards_html = "".join(
-        f'<div class="lp-mcard"><div class="lp-mlabel">{l}</div>'
-        f'<div class="lp-mval2">{v}</div><div class="lp-mdelta {cls}">{d}</div></div>'
-        for l, v, d, cls in _mcards)
-
-    st.markdown(f"""
-<style>
-.lp-wrap {{ max-width: 920px; margin: 0 auto; }}
-.lp-eyebrow {{ text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.78rem;
-  color: var(--muted); margin-bottom: 0.6rem; }}
-.lp-hero {{ font-size: clamp(2.1rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.06;
-  letter-spacing: -0.02em; color: var(--ink); margin: 0 0 0.6rem; }}
-.lp-hero .accent {{ color: var(--gold); }}
-.lp-sub {{ font-size: 1.02rem; line-height: 1.55; color: var(--ink-soft); max-width: 56ch; }}
-.lp-cta {{ display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 1.1rem;
-  padding: 0.6rem 1rem; border: 1px solid var(--border-control); border-radius: 10px;
-  color: var(--gold); font-weight: 600; font-size: 0.95rem; }}
-.lp-privacy {{ background: var(--panel); border: 1px solid var(--border-panel);
-  border-radius: 16px; padding: 1.2rem 1.3rem; margin: 1.8rem 0; color: var(--ink-soft);
-  font-size: 0.98rem; line-height: 1.5; }}
-.lp-label {{ text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.72rem;
-  color: var(--muted-deep); margin: 2rem 0 0.7rem; }}
-.lp-chips {{ display: flex; flex-wrap: wrap; gap: 0.5rem; }}
-.lp-chip {{ border: 1px solid var(--border-control); border-radius: 999px;
-  padding: 0.3rem 0.8rem; font-size: 0.85rem; color: var(--muted); }}
-.lp-feats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 0.9rem; margin-top: 0.7rem; }}
-.lp-feat {{ background: var(--surface); border: 1px solid var(--border-card);
-  border-radius: 14px; padding: 1rem 1.1rem; }}
-.lp-feat-h {{ font-weight: 700; color: var(--ink); margin-bottom: 0.3rem; }}
-.lp-feat-b {{ font-size: 0.92rem; line-height: 1.5; color: var(--muted); }}
-.lp-mock {{ position: relative; background: var(--panel); border: 1px solid var(--border-panel);
-  border-radius: 18px; padding: 1.4rem; margin-top: 0.7rem; }}
-.lp-mtag {{ position: absolute; top: 1rem; right: 1.1rem; text-transform: uppercase;
-  letter-spacing: 0.1em; font-size: 0.66rem; color: var(--muted-deep);
-  border: 1px solid var(--border-control); border-radius: 999px; padding: 0.2rem 0.6rem; }}
-.lp-mhero {{ text-align: center; margin: 0.4rem 0 1.2rem; }}
-.lp-mval {{ font-size: 2.4rem; font-weight: 800; color: var(--gold); letter-spacing: -0.02em;
-  margin: 0.2rem 0; }}
-.lp-mpnl {{ font-size: 1rem; font-weight: 600; color: var(--gain); }}
-.lp-mpnl .muted {{ color: var(--muted-deep); font-weight: 500; }}
-.lp-tree {{ display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 44px;
-  gap: 6px; margin: 0.4rem 0 1.4rem; }}
-.lp-tile {{ border-radius: 8px; padding: 0.45rem 0.55rem; display: flex; flex-direction: column;
-  justify-content: space-between; overflow: hidden; border: 1px solid transparent; }}
-.lp-tsym {{ font-size: 0.7rem; font-weight: 700; color: var(--ink); white-space: nowrap; }}
-.lp-tpnl {{ font-size: 0.64rem; font-weight: 600; }}
-.lp-tile.up {{ background: color-mix(in srgb, var(--gain) 16%, var(--surface));
-  border-color: color-mix(in srgb, var(--gain) 28%, transparent); }}
-.lp-tile.up .lp-tpnl {{ color: var(--gain); }}
-.lp-tile.down {{ background: color-mix(in srgb, var(--loss) 16%, var(--surface));
-  border-color: color-mix(in srgb, var(--loss) 28%, transparent); }}
-.lp-tile.down .lp-tpnl {{ color: var(--loss); }}
-.lp-tile.span-2 {{ grid-column: span 2; }} .lp-tile.span-3 {{ grid-column: span 3; }}
-.lp-tile.row-2 {{ grid-row: span 2; }}
-.lp-mcards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem; }}
-.lp-mcard {{ background: var(--surface); border: 1px solid var(--border-card);
-  border-radius: 14px; padding: 0.9rem 1rem; }}
-.lp-mlabel {{ text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.7rem;
-  font-weight: 600; color: var(--muted); margin-bottom: 0.4rem; }}
-.lp-mval2 {{ font-size: 1.35rem; font-weight: 700; color: var(--ink); }}
-.lp-mdelta {{ font-size: 0.8rem; font-weight: 600; margin-top: 0.25rem; }}
-.lp-mdelta.gain {{ color: var(--gain); }} .lp-mdelta.muted {{ color: var(--muted); }}
-</style>
-<div class="lp-wrap">
-  <div class="lp-eyebrow">Portfolio · Indian Markets · NSE / BSE</div>
-  <div class="lp-hero">Everything you own,<br><span class="accent">in one honest view.</span></div>
-  <div class="lp-sub">Consolidate every Indian broker — across all your accounts — into a single
-    dashboard with live prices and layered analysis: allocation, performance, technicals,
-    analyst targets, tax, risk, dividends.</div>
-  <div class="lp-cta">{cta}</div>
-  <div class="lp-privacy">{_privacy}</div>
-  <div class="lp-label">Works with your broker's export</div>
-  <div class="lp-chips">{_chips}<span class="lp-chip">+ any CSV · Excel · PDF</span></div>
-  <div class="lp-label">What you get</div>
-  <div class="lp-feats">{_feat_html}</div>
-  <div class="lp-label">A glance at the desk</div>
-  <div class="lp-mock">
-    <span class="lp-mtag">Sample data</span>
-    <div class="lp-mhero">
-      <div class="lp-eyebrow" style="margin:0;">Total portfolio value</div>
-      <div class="lp-mval">₹24,86,420</div>
-      <div class="lp-mpnl">▲ +18.4%<span class="muted">&nbsp;·&nbsp;+₹3,86,940 all-time</span></div>
-    </div>
-    <div class="lp-tree">{_tiles_html}</div>
-    <div class="lp-mcards">{_mcards_html}</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+def render_landing() -> None:
+    """Landing / welcome screen. Embeds the standalone index.html verbatim via a
+    Streamlit HTML component, so the in-app welcome looks EXACTLY like the marketing
+    page — same markup, styles, fonts, and reveal animations (the component renders in
+    an iframe that runs the page's JS, unlike st.markdown which strips scripts). Shown
+    to logged-out users above the auth form, and to logged-in users before they upload."""
+    import streamlit.components.v1 as components
+    _html = (Path(__file__).parent / "index.html").read_text(encoding="utf-8")
+    components.html(_html, height=4400, scrolling=True)
 
 
 # Auth gate (deferred to here so logged-out users see the landing first, then the form).
 if USE_DB:
     if not db.current_user():
-        render_landing(pre_login=True)
+        render_landing()
         st.divider()
         db.render_auth()
         st.stop()
