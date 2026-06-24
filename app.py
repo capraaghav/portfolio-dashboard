@@ -196,12 +196,24 @@ def render_landing() -> None:
     components.html(_html, height=4400, scrolling=True)
 
 
-# Auth gate (deferred to here so logged-out users see the landing first, then the form).
+# Auth gate. Logged-out visitors get a compact hero + the login form up top (so
+# returning users can sign in without scrolling), then the full landing below.
 if USE_DB:
     if not db.current_user():
-        render_landing()
-        st.divider()
+        st.markdown("""
+<div style="max-width:920px;margin:0 auto;text-align:center;padding:0.6rem 0 0.2rem;">
+  <div style="text-transform:uppercase;letter-spacing:0.16em;font-size:0.78rem;color:var(--muted);">
+    Portfolio · Indian Markets · NSE / BSE</div>
+  <div style="font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;line-height:1.08;
+    letter-spacing:-0.02em;color:var(--ink);margin:0.4rem 0 0.3rem;">
+    Everything you own, <span style="color:var(--gold);">in one honest view.</span></div>
+  <div style="color:var(--ink-soft);font-size:1rem;">
+    Sign in below — or scroll down to see what it does.</div>
+</div>
+""", unsafe_allow_html=True)
         db.render_auth()
+        st.divider()
+        render_landing()   # full index.html landing beneath the form
         st.stop()
     db.persist_cookie()   # (re)write the refresh-token cookie each logged-in run
 
