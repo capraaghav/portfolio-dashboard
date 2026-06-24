@@ -100,7 +100,9 @@ def account_stacked(bar_data: pd.DataFrame) -> go.Figure | None:
 
 # ─── Technical ───────────────────────────────────────────────────────────────
 
-def vs_50ma_bar(ta_signals: dict) -> go.Figure | None:
+def vs_50ma_bar(ta_signals: dict, order: list | None = None) -> go.Figure | None:
+    """Horizontal bar: each holding's price vs its 50-day MA. `order` (bottom→top
+    ticker list) locks the row order so it matches the RSI chart row-for-row."""
     rows = []
     for t, sig in ta_signals.items():
         if sig.get("vs_50ma") is not None:
@@ -112,33 +114,62 @@ def vs_50ma_bar(ta_signals: dict) -> go.Figure | None:
                 pass
     if not rows:
         return None
-    df = pd.DataFrame(rows).sort_values("vs 50MA (%)")
-    fig = px.bar(df, x="vs 50MA (%)", y="Ticker", orientation="h", color="Signal",
-                 color_discrete_map=SIGNAL_COLOR, title="Price vs 50-Day Moving Average (%)",
-                 height=max(350, len(df) * 18))
-    fig.add_vline(x=0, line_dash="dash", line_color="white", opacity=0.4)
-    fig.update_layout(showlegend=True, legend=dict(orientation="h", y=1.05),
-                      margin=dict(t=60, b=20, l=10, r=20), yaxis=dict(tickfont=dict(size=10)))
+    df = pd.DataFrame(rows)
+    fig = px.bar(df, x="Ticker", y="vs 50MA (%)", color="Signal",
+                 color_discrete_map=SIGNAL_COLOR, height=440)
+    fig.add_hline(y=0, line_dash="dash", line_color="white", opacity=0.35)
+    fig.update_layout(title_text="", showlegend=True,
+                      legend=dict(orientation="h", y=1.08, x=0, title_text="", font=dict(size=11)),
+                      margin=dict(t=12, b=10, l=10, r=10),
+                      xaxis=dict(title_text="", tickangle=-90, tickfont=dict(size=9)),
+                      yaxis=dict(title_text="", tickfont=dict(size=11)))
+    if order:
+        fig.update_xaxes(categoryorder="array", categoryarray=order)
     return fig
 
 
-def rsi_bar(ta_signals: dict) -> go.Figure | None:
+def rsi_bar(ta_signals: dict, order: list | None = None) -> go.Figure | None:
+    """Horizontal RSI bars with shaded overbought (>70) / oversold (<30) zones.
+    `order` matches vs_50ma_bar so the same ticker sits on the same row."""
     rows = [{"Ticker": t, "RSI": s["rsi"], "Signal": s["signal"]}
             for t, s in ta_signals.items()
             if s.get("rsi") is not None and not (isinstance(s["rsi"], float) and np.isnan(s["rsi"]))]
     if not rows:
         return None
-    df = pd.DataFrame(rows).sort_values("RSI")
-    fig = px.bar(df, x="RSI", y="Ticker", orientation="h", color="Signal",
-                 color_discrete_map=SIGNAL_COLOR, title="RSI (14-day)",
-                 height=max(350, len(df) * 18))
-    fig.add_vline(x=70, line_dash="dot", line_color=LOSS,
-                  annotation_text="Overbought (70)", annotation_position="top right")
-    fig.add_vline(x=30, line_dash="dot", line_color=GAIN,
-                  annotation_text="Oversold (30)", annotation_position="bottom right")
-    fig.add_vline(x=50, line_dash="dash", line_color="white", opacity=0.3)
-    fig.update_layout(showlegend=False, margin=dict(t=60, b=20, l=10, r=20),
-                      xaxis=dict(range=[0, 100]), yaxis=dict(tickfont=dict(size=10)))
+    df = pd.DataFrame(rows)
+    fig = px.bar(df, x="Ticker", y="RSI", color="Signal",
+                 color_discrete_map=SIGNAL_COLOR, height=440)
+    fig.add_hrect(y0=70, y1=100, fillcolor=LOSS, opacity=0.10, line_width=0,
+                  annotation_text="Overbought", annotation_position="top left",
+                  annotation_font=dict(size=10, color=LOSS))
+    fig.add_hrect(y0=0, y1=30, fillcolor=GAIN, opacity=0.10, line_width=0,
+                  annotation_text="Oversold", annotation_position="bottom left",
+                  annotation_font=dict(size=10, color=GAIN))
+    fig.add_hline(y=50, line_dash="dash", line_color="white", opacity=0.25)
+    fig.update_layout(title_text="", showlegend=False, margin=dict(t=12, b=10, l=10, r=10),
+                      xaxis=dict(title_text="", tickangle=-90, tickfont=dict(size=9)),
+                      yaxis=dict(title_text="", range=[0, 100], tickfont=dict(size=11)))
+    if order:
+        fig.update_xaxes(categoryorder="array", categoryarray=order)
+    return fig
+
+
+def signal_distribution_bar(counts: dict) -> go.Figure | None:
+    """Single stacked horizontal bar: portfolio trend mix, bull→bear, by proportion."""
+    seq = ["Strong Bullish", "Bullish", "Neutral", "Bearish", "Strong Bearish"]
+    present = [(s, counts.get(s, 0)) for s in seq if counts.get(s, 0) > 0]
+    if not present:
+        return None
+    fig = go.Figure()
+    for s, c in present:
+        fig.add_bar(y=[""], x=[c], orientation="h", name=s,
+                    marker=dict(color=SIGNAL_COLOR[s], line=dict(width=0)),
+                    text=str(c), textposition="inside", insidetextanchor="middle",
+                    textfont=dict(color="#0A0A0A", size=12),
+                    hovertemplate=f"{s}: {c}<extra></extra>")
+    fig.update_layout(barmode="stack", height=58, showlegend=False, bargap=0,
+                      title_text="", margin=dict(t=2, b=2, l=2, r=2),
+                      xaxis=dict(visible=False), yaxis=dict(visible=False))
     return fig
 
 

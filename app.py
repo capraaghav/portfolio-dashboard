@@ -873,22 +873,102 @@ elif section == "🔬 Technical":
                        "Click **🔄 Refresh data** in the sidebar to retry (it bulk-downloads in one request).")
         st.caption("Price vs SMA50 sets Bullish/Bearish. Strong = SMA50 also above/below SMA200 "
                    "(golden/death cross). RSI 14: >70 overbought, <30 oversold.")
+
+        def _vs50f(t):
+            v = ta_signals.get(t, {}).get("vs_50ma")
+            if not v:
+                return None
+            try:
+                return float(v.replace("%", "").replace("+", ""))
+            except ValueError:
+                return None
+
+        valid = [t for t in ta_signals if ta_signals[t].get("signal", "N/A") != "N/A"]
         counts = {s: 0 for s in SIGNAL_ORDER}
         for t in ta_signals:
             counts[ta_signals[t].get("signal", "N/A")] = counts.get(ta_signals[t].get("signal", "N/A"), 0) + 1
+
+        # ── Mood: 5 count cards + distribution bar + headline ──
         cc = st.columns(5)
         for col, key, lbl in zip(cc, ["Strong Bullish", "Bullish", "Neutral", "Bearish", "Strong Bearish"],
                                  ["↑↑ Strong Bull", "↑ Bullish", "→ Neutral", "↓ Bearish", "↓↓ Strong Bear"]):
             col.metric(lbl, counts.get(key, 0))
-        t1, t2 = st.columns([3, 2])
-        with t1:
-            f = charts.vs_50ma_bar(ta_signals)
+        dist = charts.signal_distribution_bar(counts)
+        if dist:
+            st.plotly_chart(dist, use_container_width=True, config={"displayModeBar": False})
+        total = len(valid)
+        if total:
+            n_bull = counts["Strong Bullish"] + counts["Bullish"]
+            n_bear = counts["Strong Bearish"] + counts["Bearish"]
+            above50 = sum(1 for t in valid if (_vs50f(t) or 0) > 0)
+            mood = "leans bullish" if n_bull > n_bear else ("leans bearish" if n_bear > n_bull else "is mixed")
+            st.markdown(f"Portfolio **{mood}** — **{above50} of {total}** holdings trade above their 50-day average.")
+
+        st.divider()
+
+        # ── Controls: sort + how many ──
+        sc1, sc2 = st.columns([2, 1])
+        sort_by = sc1.selectbox("Sort bars by",
+                                ["Most extreme (vs 50MA)", "Trend strength", "RSI"])
+        show_all = sc2.toggle(f"Show all ({total})", value=False,
+                              help="Off shows the ~16 most extreme; on shows every holding.")
+
+        if sort_by.startswith("Most extreme"):
+            keyed = sorted(valid, key=lambda t: (_vs50f(t) if _vs50f(t) is not None else 0.0))
+        elif sort_by == "RSI":
+            keyed = sorted(valid, key=lambda t: (ta_signals[t].get("rsi")
+                           if pd.notna(ta_signals[t].get("rsi")) else 0.0))
+        else:  # Trend strength — Strong Bear (bottom) → Strong Bull (top)
+            keyed = sorted(valid, key=lambda t: -SIGNAL_ORDER.index(ta_signals[t].get("signal", "N/A")))
+
+        if not show_all and len(keyed) > 16:
+            order = keyed[:8] + keyed[-8:]   # bottom 8 + top 8 of the active sort
+        else:
+            order = keyed
+        sub = {t: ta_signals[t] for t in order}
+
+        b1, b2 = st.columns(2)
+        with b1:
+            st.markdown("**Price vs 50-Day MA (%)**")
+            f = charts.vs_50ma_bar(sub, order)
             if f:
-                st.plotly_chart(f, use_container_width=True)
-        with t2:
-            f = charts.rsi_bar(ta_signals)
+                st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+        with b2:
+            st.markdown("**RSI (14-day)**")
+            f = charts.rsi_bar(sub, order)
             if f:
-                st.plotly_chart(f, use_container_width=True)
+                st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+
+        # ── Searchable, sortable signal table (all holdings) ──
+        st.divider()
+        st.markdown("**All signals**")
+        ta_q = st.text_input("Search ticker", key="ta_search", placeholder="e.g. RELIANCE")
+        trows = [{"Ticker": t, "Trend": ta_signals[t]["label"],
+                  "RSI": ta_signals[t]["rsi"], "vs 50MA (%)": _vs50f(t)} for t in valid]
+        tdf = pd.DataFrame(trows).sort_values("vs 50MA (%)", ascending=False, na_position="last")
+        if ta_q:
+            tdf = tdf[tdf["Ticker"].str.contains(ta_q.strip().upper())]
+        tdisp = tdf.copy()
+        tdisp["RSI"] = tdisp["RSI"].apply(lambda x: f"{x:.0f}" if pd.notna(x) else "—")
+        tdisp["vs 50MA (%)"] = tdisp["vs 50MA (%)"].apply(lambda x: f"{x:+.1f}%" if pd.notna(x) else "—")
+
+        def _trend_color(lbl):
+            if "Bull" in lbl:
+                return f"color: {GAIN}"
+            if "Bear" in lbl:
+                return f"color: {LOSS}"
+            return f"color: {MUTED}"
+
+        def _vs_color(_series):
+            return [f"color: {GAIN}" if (pd.notna(v) and v > 0)
+                    else (f"color: {LOSS}" if (pd.notna(v) and v < 0) else "")
+                    for v in tdf["vs 50MA (%)"].to_numpy()]
+
+        tsty = (tdisp.style
+                .apply(_vs_color, axis=0, subset=["vs 50MA (%)"])
+                .map(_trend_color, subset=["Trend"]))
+        st.dataframe(tsty, width='stretch', hide_index=True,
+                     height=min(45 + 36 * len(tdisp), 520))
 
 
 # ═══ ANALYSTS ═════════════════════════════════════════════════════════════════
