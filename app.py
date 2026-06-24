@@ -167,10 +167,8 @@ store = db if USE_DB else storage
 if USE_DB:
     db.init_cookies()     # construct the CookieManager once for this run (before any get/set)
     db.restore_session()  # re-auth from cookie after a browser refresh wipes session_state
-    if not db.current_user():
-        db.render_auth()
-        st.stop()
-    db.persist_cookie()   # (re)write the refresh-token cookie each logged-in run
+    # NOTE: the auth gate is deferred to just after render_landing() is defined, so a
+    # logged-out visitor sees the landing page first and the login form below it.
 
 def _is_multiuser() -> bool:
     if os.getenv("PORTFOLIO_MULTIUSER") == "1":
@@ -185,6 +183,99 @@ if MULTIUSER:
     if "_sid" not in st.session_state:
         st.session_state["_sid"] = uuid.uuid4().hex[:12]
     storage.configure(Path(tempfile.gettempdir()) / "portfolio_sessions" / st.session_state["_sid"])
+
+
+def render_landing(pre_login: bool = False) -> None:
+    """Landing / welcome screen. Shown to logged-out users (above the auth form) and to
+    logged-in users before they upload. Static HTML on the app's own theme tokens — no JS
+    (Streamlit strips <script>); the animated version lives in standalone index.html."""
+    if USE_DB:
+        _privacy = ("🔒 Stored privately to your account — row-level security means "
+                    "only you can ever see your holdings.")
+    elif MULTIUSER:
+        _privacy = ("🔒 Processed in a private session and never stored after you leave. "
+                    "Other visitors can't see your data.")
+    else:
+        _privacy = ("🔒 Runs entirely on your machine — your holdings never leave your "
+                    "computer. The only outbound calls are to Yahoo Finance for prices.")
+
+    cta = ("↓ Log in or sign up just below to get started." if pre_login
+           else "⚙️ Open Upload / Data in the sidebar to begin ↖")
+
+    _brokers = ["Zerodha", "Groww", "Upstox", "Angel One", "HDFC Securities",
+                "Reliance", "IndusInd", "IIFL"]
+    _chips = "".join(f'<span class="lp-chip">{b}</span>' for b in _brokers)
+
+    # Feature narrative — deliberately varied blocks, not an identical icon-card grid.
+    _features = [
+        ("Lead with the picture",
+         "A treemap heatmap sizes each position by value and colours it by gain/loss, "
+         "with allocation by stock and sector beside it."),
+        ("Performance you can trust",
+         "Daily snapshots build a value timeline, XIRR uses your real purchase dates, and "
+         "a backtest replays your basket against NIFTY 50, SENSEX, Bank Nifty or Midcap."),
+        ("Depth on demand",
+         "Technical signals (SMA / RSI), 12-month analyst targets, LTCG/STCG tax, "
+         "concentration risk and dividend income — each behind a toggle, never dumped at once."),
+        ("Every broker, one view",
+         "CSV, Excel or PDF from any Indian broker — company names and ISINs are auto-matched "
+         "to NSE/BSE tickers, and a stock held in several accounts is consolidated into one row."),
+    ]
+    _feat_html = "".join(
+        f'<div class="lp-feat"><div class="lp-feat-h">{h}</div>'
+        f'<div class="lp-feat-b">{b}</div></div>' for h, b in _features)
+
+    st.markdown(f"""
+<style>
+.lp-wrap {{ max-width: 920px; margin: 0 auto; }}
+.lp-eyebrow {{ text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.78rem;
+  color: var(--muted); margin-bottom: 0.6rem; }}
+.lp-hero {{ font-size: clamp(2.1rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.06;
+  letter-spacing: -0.02em; color: var(--ink); margin: 0 0 0.6rem; }}
+.lp-hero .accent {{ color: var(--gold); }}
+.lp-sub {{ font-size: 1.02rem; line-height: 1.55; color: var(--ink-soft); max-width: 56ch; }}
+.lp-cta {{ display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 1.1rem;
+  padding: 0.6rem 1rem; border: 1px solid var(--border-control); border-radius: 10px;
+  color: var(--gold); font-weight: 600; font-size: 0.95rem; }}
+.lp-privacy {{ background: var(--panel); border: 1px solid var(--border-panel);
+  border-radius: 16px; padding: 1.2rem 1.3rem; margin: 1.8rem 0; color: var(--ink-soft);
+  font-size: 0.98rem; line-height: 1.5; }}
+.lp-label {{ text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.72rem;
+  color: var(--muted-deep); margin: 2rem 0 0.7rem; }}
+.lp-chips {{ display: flex; flex-wrap: wrap; gap: 0.5rem; }}
+.lp-chip {{ border: 1px solid var(--border-control); border-radius: 999px;
+  padding: 0.3rem 0.8rem; font-size: 0.85rem; color: var(--muted); }}
+.lp-feats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem; margin-top: 0.7rem; }}
+.lp-feat {{ background: var(--surface); border: 1px solid var(--border-card);
+  border-radius: 14px; padding: 1rem 1.1rem; }}
+.lp-feat-h {{ font-weight: 700; color: var(--ink); margin-bottom: 0.3rem; }}
+.lp-feat-b {{ font-size: 0.92rem; line-height: 1.5; color: var(--muted); }}
+</style>
+<div class="lp-wrap">
+  <div class="lp-eyebrow">Portfolio · Indian Markets · NSE / BSE</div>
+  <div class="lp-hero">Everything you own,<br><span class="accent">in one honest view.</span></div>
+  <div class="lp-sub">Consolidate every Indian broker — across all your accounts — into a single
+    dashboard with live prices and layered analysis: allocation, performance, technicals,
+    analyst targets, tax, risk, dividends.</div>
+  <div class="lp-cta">{cta}</div>
+  <div class="lp-privacy">{_privacy}</div>
+  <div class="lp-label">Works with your broker's export</div>
+  <div class="lp-chips">{_chips}<span class="lp-chip">+ any CSV · Excel · PDF</span></div>
+  <div class="lp-label">What you get</div>
+  <div class="lp-feats">{_feat_html}</div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# Auth gate (deferred to here so logged-out users see the landing first, then the form).
+if USE_DB:
+    if not db.current_user():
+        render_landing(pre_login=True)
+        st.divider()
+        db.render_auth()
+        st.stop()
+    db.persist_cookie()   # (re)write the refresh-token cookie each logged-in run
 
 # ─── Session state ────────────────────────────────────────────────────────────
 
@@ -391,84 +482,7 @@ elif use_saved or st.session_state.get("_use_saved"):
     raw = store.load_session()
 
 if raw is None or raw.empty:
-    # Landing / welcome — shown before any file is uploaded. Static HTML styled with
-    # the app's own theme tokens (var(--gold) etc, defined in the :root block up top).
-    # No JS — Streamlit strips <script>; the reveal/motion lives only in the standalone
-    # index.html marketing page.
-    if USE_DB:
-        _privacy = ("🔒 Stored privately to your account — row-level security means "
-                    "only you can ever see your holdings.")
-    elif MULTIUSER:
-        _privacy = ("🔒 Processed in a private session and never stored after you leave. "
-                    "Other visitors can't see your data.")
-    else:
-        _privacy = ("🔒 Runs entirely on your machine — your holdings never leave your "
-                    "computer. The only outbound calls are to Yahoo Finance for prices.")
-
-    _brokers = ["Zerodha", "Groww", "Upstox", "Angel One", "HDFC Securities",
-                "Reliance", "IndusInd", "IIFL"]
-    _chips = "".join(f'<span class="lp-chip">{b}</span>' for b in _brokers)
-
-    # Feature narrative — deliberately varied blocks, not an identical icon-card grid.
-    _features = [
-        ("Lead with the picture",
-         "A treemap heatmap sizes each position by value and colours it by gain/loss, "
-         "with allocation by stock and sector beside it."),
-        ("Performance you can trust",
-         "Daily snapshots build a value timeline, XIRR uses your real purchase dates, and "
-         "a backtest replays your basket against NIFTY 50, SENSEX, Bank Nifty or Midcap."),
-        ("Depth on demand",
-         "Technical signals (SMA / RSI), 12-month analyst targets, LTCG/STCG tax, "
-         "concentration risk and dividend income — each behind a toggle, never dumped at once."),
-        ("Every broker, one view",
-         "CSV, Excel or PDF from any Indian broker — company names and ISINs are auto-matched "
-         "to NSE/BSE tickers, and a stock held in several accounts is consolidated into one row."),
-    ]
-    _feat_html = "".join(
-        f'<div class="lp-feat"><div class="lp-feat-h">{h}</div>'
-        f'<div class="lp-feat-b">{b}</div></div>' for h, b in _features)
-
-    st.markdown(f"""
-<style>
-.lp-wrap {{ max-width: 920px; margin: 0 auto; }}
-.lp-eyebrow {{ text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.78rem;
-  color: var(--muted); margin-bottom: 0.6rem; }}
-.lp-hero {{ font-size: clamp(2.1rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.06;
-  letter-spacing: -0.02em; color: var(--ink); margin: 0 0 0.6rem; }}
-.lp-hero .accent {{ color: var(--gold); }}
-.lp-sub {{ font-size: 1.02rem; line-height: 1.55; color: var(--ink-soft); max-width: 56ch; }}
-.lp-cta {{ display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 1.1rem;
-  padding: 0.6rem 1rem; border: 1px solid var(--border-control); border-radius: 10px;
-  color: var(--gold); font-weight: 600; font-size: 0.95rem; }}
-.lp-privacy {{ background: var(--panel); border: 1px solid var(--border-panel);
-  border-radius: 16px; padding: 1.2rem 1.3rem; margin: 1.8rem 0; color: var(--ink-soft);
-  font-size: 0.98rem; line-height: 1.5; }}
-.lp-label {{ text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.72rem;
-  color: var(--muted-deep); margin: 2rem 0 0.7rem; }}
-.lp-chips {{ display: flex; flex-wrap: wrap; gap: 0.5rem; }}
-.lp-chip {{ border: 1px solid var(--border-control); border-radius: 999px;
-  padding: 0.3rem 0.8rem; font-size: 0.85rem; color: var(--muted); }}
-.lp-feats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 0.9rem; margin-top: 0.7rem; }}
-.lp-feat {{ background: var(--surface); border: 1px solid var(--border-card);
-  border-radius: 14px; padding: 1rem 1.1rem; }}
-.lp-feat-h {{ font-weight: 700; color: var(--ink); margin-bottom: 0.3rem; }}
-.lp-feat-b {{ font-size: 0.92rem; line-height: 1.5; color: var(--muted); }}
-</style>
-<div class="lp-wrap">
-  <div class="lp-eyebrow">Portfolio · Indian Markets · NSE / BSE</div>
-  <div class="lp-hero">Everything you own,<br><span class="accent">in one honest view.</span></div>
-  <div class="lp-sub">Consolidate every Indian broker — across all your accounts — into a single
-    dashboard with live prices and layered analysis: allocation, performance, technicals,
-    analyst targets, tax, risk, dividends.</div>
-  <div class="lp-cta">⚙️ Open <b>Upload / Data</b> in the sidebar to begin&nbsp;↖</div>
-  <div class="lp-privacy">{_privacy}</div>
-  <div class="lp-label">Works with your broker's export</div>
-  <div class="lp-chips">{_chips}<span class="lp-chip">+ any CSV · Excel · PDF</span></div>
-  <div class="lp-label">What you get</div>
-  <div class="lp-feats">{_feat_html}</div>
-</div>
-""", unsafe_allow_html=True)
+    render_landing()
     st.stop()
 
 # ─── Resolve symbols (some brokers store the full company name or only an ISIN) ─
