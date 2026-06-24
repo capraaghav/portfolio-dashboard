@@ -161,6 +161,7 @@ click_spark(spark_color=GOLD, spark_size=13, spark_radius=30, spark_count=9, dur
 # stores each user's portfolio/snapshots/watchlist privately in Supabase. Otherwise
 # it behaves exactly as before (local files, with optional per-session isolation).
 
+LANDING_URL = "https://capraaghav.github.io/portfolio-dashboard/"  # standalone marketing page (GitHub Pages)
 USE_DB = db.is_enabled()
 store = db if USE_DB else storage
 
@@ -197,6 +198,7 @@ def render_landing(subline: str) -> None:
     letter-spacing:-0.02em;color:var(--ink);margin:0.4rem 0 0.3rem;">
     Everything you own, <span style="color:var(--gold);">in one honest view.</span></div>
   <div style="color:var(--ink-soft);font-size:1rem;">{subline}</div>
+  <div style="margin-top:0.7rem;"><a href="{LANDING_URL}" target="_blank" style="color:var(--gold);font-weight:600;font-size:0.92rem;text-decoration:none;">New here? See what it does →</a></div>
 </div>
 """, unsafe_allow_html=True)
 
