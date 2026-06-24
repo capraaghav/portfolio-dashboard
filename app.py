@@ -24,7 +24,7 @@ import parsers
 import storage
 from click_spark import click_spark
 from formatting import (
-    fmt_inr, fmt_pct, fmt_num, fmt_int, fmt_mcap,
+    fmt_inr, fmt_pct, fmt_num, fmt_mcap,
     REC_LABEL, SIGNAL_ORDER, GAIN, LOSS,
     GOLD, BG, SURFACE, BORDER, TEXT, MUTED, GRID,
     SIDEBAR, PANEL, HOVER, SELECTED, SHIMMER,

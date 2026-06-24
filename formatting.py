@@ -106,11 +106,6 @@ def fmt_num(val, decimals=2) -> str:
     return "—" if v is None else f"{v:,.{decimals}f}"
 
 
-def fmt_int(val) -> str:
-    v = _num(val)
-    return "—" if v is None else f"{int(v):,}"
-
-
 def fmt_mcap(val) -> str:
     """Market cap in Indian crore."""
     v = _num(val)
