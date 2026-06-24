@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-24T00:00:00Z",
+  "title": "Design System: Portfolio Dashboard — Indian Markets",
+  "extensions": {
+    "colorMeta": {
+      "gold": {
+        "role": "primary",
+        "displayName": "Champagne Gold",
+        "canonical": "oklch(73.5% 0.058 76)",
+        "tonalRamp": ["oklch(20% 0.02 76)", "oklch(30% 0.03 76)", "oklch(40% 0.04 76)", "oklch(50% 0.05 76)", "oklch(60% 0.056 76)", "oklch(73.5% 0.058 76)", "oklch(84% 0.045 76)", "oklch(94% 0.025 76)"]
+      },
+      "gain": {
+        "role": "secondary",
+        "displayName": "Mint Gain",
+        "canonical": "oklch(80% 0.16 162)",
+        "tonalRamp": ["oklch(25% 0.06 162)", "oklch(35% 0.09 162)", "oklch(45% 0.12 162)", "oklch(55% 0.15 162)", "oklch(65% 0.16 162)", "oklch(80% 0.16 162)", "oklch(88% 0.11 162)", "oklch(95% 0.05 162)"]
+      },
+      "loss": {
+        "role": "secondary",
+        "displayName": "Coral Loss",
+        "canonical": "oklch(64% 0.2 27)",
+        "tonalRamp": ["oklch(25% 0.08 27)", "oklch(34% 0.11 27)", "oklch(44% 0.15 27)", "oklch(54% 0.18 27)", "oklch(64% 0.2 27)", "oklch(74% 0.16 27)", "oklch(85% 0.1 27)", "oklch(94% 0.04 27)"]
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Room Black",
+        "canonical": "oklch(13% 0 0)",
+        "tonalRamp": ["oklch(13% 0 0)", "oklch(14% 0 0)", "oklch(16% 0 0)", "oklch(18% 0 0)", "oklch(20% 0 0)", "oklch(24% 0 0)", "oklch(30% 0 0)", "oklch(40% 0 0)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(94% 0 0)",
+        "tonalRamp": ["oklch(40% 0 0)", "oklch(48% 0 0)", "oklch(56% 0 0)", "oklch(62% 0 0)", "oklch(70% 0 0)", "oklch(78% 0 0)", "oklch(86% 0 0)", "oklch(94% 0 0)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The centered hero portfolio value, in gold. Once per overview." },
+      "brand": { "displayName": "Brand Wordmark", "purpose": "The PORTFOLIO sidebar logotype — the only wide-tracked element." },
+      "title": { "displayName": "Title", "purpose": "Metric-card values users scan." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles within a tab." },
+      "body": { "displayName": "Body", "purpose": "Nav labels, controls, prose (cap prose at 65–75ch)." },
+      "label": { "displayName": "Label", "purpose": "Small tracked uppercase that names a figure without competing with it." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "control-ease", "value": "150ms ease", "purpose": "Button/nav state transitions — the control lights to the lamp on contact, then releases." },
+      { "name": "shimmer", "value": "1.4s ease infinite", "purpose": "Skeleton-loader gradient sweep while the cold data load runs. Hold steady under prefers-reduced-motion." },
+      { "name": "click-spark", "value": "400ms", "purpose": "Gold sparks radiating from every click. Respect prefers-reduced-motion." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Hero Value",
+      "kind": "custom",
+      "refersTo": "hero-value",
+      "description": "The single loudest moment in the product — centered portfolio value in gold with a sign-carrying P&L line. Used once per overview.",
+      "html": "<div class=\"ds-hero\"><div class=\"ds-hero-label\">Total Portfolio Value</div><div class=\"ds-hero-value\">₹48,21,650</div><div class=\"ds-hero-pnl\"><span class=\"ds-gain\">+₹3,14,200 P&amp;L (+6.97%)</span></div><div class=\"ds-hero-sub\">across 4 accounts · 37 holdings</div></div>",
+      "css": ".ds-hero { text-align: center; padding: 1.4rem 0 0.6rem; font-family: Inter, -apple-system, sans-serif; } .ds-hero-label { text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.8rem; color: #8B8B8B; } .ds-hero-value { font-size: 3.4rem; font-weight: 800; color: #C9A87A; line-height: 1.05; margin: 0.2rem 0; letter-spacing: -0.02em; } .ds-hero-pnl { font-size: 1.15rem; font-weight: 600; } .ds-gain { color: #3DDC97; } .ds-loss { color: #F0564A; } .ds-hero-sub { color: #8B8B8B; font-size: 0.9rem; margin-top: 0.2rem; }"
+    },
+    {
+      "name": "Metric Card",
+      "kind": "card",
+      "refersTo": "metric-card",
+      "description": "Per-figure card: small uppercase muted label, large ink value, mint/coral delta. The unit of the scannable dashboard.",
+      "html": "<div class=\"ds-metric\"><div class=\"ds-metric-label\">Day's Change</div><div class=\"ds-metric-value\">₹12,480</div><div class=\"ds-metric-delta ds-gain\">▲ +0.41%</div></div>",
+      "css": ".ds-metric { background: #141414; border: 1px solid #262626; border-radius: 14px; padding: 1rem 1.1rem; font-family: Inter, -apple-system, sans-serif; min-width: 180px; } .ds-metric-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; font-weight: 600; color: #8B8B8B; } .ds-metric-value { font-size: 1.65rem; font-weight: 700; color: #EDEDED; margin-top: 0.25rem; } .ds-metric-delta { font-size: 0.9rem; font-weight: 600; margin-top: 0.1rem; } .ds-gain { color: #3DDC97; } .ds-loss { color: #F0564A; }"
+    },
+    {
+      "name": "Container Card",
+      "kind": "card",
+      "refersTo": "container-card",
+      "description": "The larger wrapper around charts and tables. Flat — depth from tonal step + hairline border, never shadow. Never nested.",
+      "html": "<div class=\"ds-container\"><div class=\"ds-container-title\">Allocation by Sector</div><div class=\"ds-container-body\">chart / table region</div></div>",
+      "css": ".ds-container { background: #121212; border: 1px solid #232323; border-radius: 16px; padding: 1.1rem; font-family: Inter, -apple-system, sans-serif; } .ds-container-title { font-size: 1.5rem; font-weight: 700; color: #EDEDED; letter-spacing: -0.01em; margin-bottom: 0.5rem; } .ds-container-body { color: #8B8B8B; font-size: 0.95rem; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The only button style — understated. Lights to gold on hover/focus. There is no filled primary; gold is spent on data, not controls.",
+      "html": "<button class=\"ds-btn\">Export to Excel</button>",
+      "css": ".ds-btn { font-family: Inter, -apple-system, sans-serif; font-weight: 500; font-size: 0.92rem; color: #EDEDED; background: #161616; border: 1px solid #2A2A2A; border-radius: 10px; padding: 0.45rem 0.95rem; cursor: pointer; transition: border-color 150ms ease, color 150ms ease; } .ds-btn:hover { border-color: #C9A87A; color: #C9A87A; } .ds-btn:focus-visible { outline: none; border-color: #C9A87A; color: #C9A87A; box-shadow: 0 0 0 2px rgba(201,168,122,0.35); } .ds-btn:active { background: #1a1a1a; }"
+    },
+    {
+      "name": "Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Sidebar nav (a restyled radio group). Selected item is the only lit row — gold label on a gold-tinted black.",
+      "html": "<div class=\"ds-nav\"><div class=\"ds-nav-item ds-nav-selected\">📊 Overview</div><div class=\"ds-nav-item\">📋 Holdings</div><div class=\"ds-nav-item\">📈 Performance</div></div>",
+      "css": ".ds-nav { background: #0C0C0C; padding: 0.4rem; border-radius: 12px; display: flex; flex-direction: column; gap: 2px; font-family: Inter, -apple-system, sans-serif; } .ds-nav-item { display: flex; align-items: center; padding: 0.5rem 0.7rem; border-radius: 10px; font-size: 0.95rem; font-weight: 500; color: #B9B9B9; cursor: pointer; transition: background 150ms ease; } .ds-nav-item:hover { background: #161616; } .ds-nav-selected { background: #18170F; color: #C9A87A; font-weight: 600; } .ds-nav-selected:hover { background: #18170F; }"
+    },
+    {
+      "name": "Skeleton Loader",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Dashboard-shaped loading state — never a spinner. Shimmer bars mirror the real page geometry. Hold steady under reduced motion.",
+      "html": "<div class=\"ds-sk-card\"><div class=\"ds-sk\" style=\"height:12px;width:55%;margin-bottom:14px;\"></div><div class=\"ds-sk\" style=\"height:26px;width:78%;\"></div></div>",
+      "css": ".ds-sk { background: linear-gradient(90deg, #141414 25%, #1F1F1F 37%, #141414 63%); background-size: 400% 100%; animation: ds-sksh 1.4s ease infinite; border-radius: 8px; } @keyframes ds-sksh { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } } .ds-sk-card { background: #121212; border: 1px solid #232323; border-radius: 14px; padding: 1.1rem; } @media (prefers-reduced-motion: reduce) { .ds-sk { animation: none; background: #1a1a1a; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The After-Hours Desk",
+    "overview": "The analyst's desk after market close: the room is dark, the screen is the only light source, and a single warm lamp — champagne gold — pools over the figures that matter. Everything is built so the numbers glow and the chrome recedes. A near-black canvas, surfaces stacked in tight tonal steps, one accent held to a tenth of any screen, and mint/coral reserved strictly for profit and loss. Nothing blinks, nothing celebrates, nothing hurries; the cadence is reflective. Restrained in the strict sense: tinted near-blacks plus one accent. Density is welcome where the data earns it, never manufactured by decoration. Depth is conveyed by tone, not shadow — one surface sits above another because it is a half-step lighter, the way objects separate under low light.",
+    "keyCharacteristics": [
+      "Low-light dark room; data is the only thing that glows.",
+      "One accent (champagne gold), held rare; restraint is the identity.",
+      "Tonal layering over shadows — depth from lightness steps, surfaces flat at rest.",
+      "Inter everywhere, in weight — no display/body pairing.",
+      "Numbers are the hero: typography and spacing do the work, decoration does none.",
+      "P&L never relies on color alone — sign and figure carry the meaning too."
+    ],
+    "rules": [
+      { "name": "The One Lamp Rule", "body": "Champagne gold appears on no more than ~10% of any screen, and only to mark the brand, the single headline figure, the current selection, or a state. The moment gold is used decoratively, the room stops being lit and starts being painted.", "section": "colors" },
+      { "name": "The P&L Is Not Just Color Rule", "body": "Gains and losses are never communicated by mint vs. coral alone. The sign, the formatted figure, or a label always rides alongside the color, so a color-blind user reads the position correctly.", "section": "colors" },
+      { "name": "The One Family Rule", "body": "Inter does everything. Introducing a second typeface reads as costume, not craft. Range lives in weight and size, never in family.", "section": "typography" },
+      { "name": "The Quiet Caps Rule", "body": "Uppercase is reserved for small tracked labels and the brand wordmark. Never set a heading or a value in caps.", "section": "typography" },
+      { "name": "The Tonal-Depth Rule", "body": "Separation between surfaces is achieved with the panel-step ramp plus a hairline border, never with box-shadow. A drop shadow on a card here is a bug, not a style.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep champagne gold (#C9A87A) to ~10% of any screen — brand, the one headline figure, current selection, and states only.",
+      "Do convey gains/losses with sign and figure plus color, never mint/coral alone — AA color-blind safety is non-negotiable in a finance tool.",
+      "Do create depth with the panel-step ramp (#0C0C0C→#161616) and hairline borders, not shadows.",
+      "Do set everything in Inter, varying weight (400–800) and size for hierarchy.",
+      "Do verify text contrast against the near-black canvas: #EDEDED/#B9B9B9 are safe; #8B8B8B (5.8:1) and #808080 (5.0:1) pass AA — never drop text below #808080 (#555555 and darker are disabled glyphs and hairlines only).",
+      "Do show the dashboard-shaped skeleton on cold loads; never a centered spinner.",
+      "Do let tables and panels run dense when the data earns it; lead with the consolidated picture and keep heavy analysis behind toggles."
+    ],
+    "donts": [
+      "Don't build the loud retail trading app — no neon green/red, no gamified gains, no confetti.",
+      "Don't build the cluttered Bloomberg terminal — never dump wall-to-wall data with no hierarchy or air.",
+      "Don't drift toward cartoonish/playful fintech — no mascots, bright illustration, or 'friendly money' styling.",
+      "Don't ship generic SaaS slop: no purple gradients, no gradient text, no identical icon-card grids, no hero-metric template.",
+      "Don't put a box-shadow under a card, or use a border-left/border-right greater than 1px as a colored accent stripe.",
+      "Don't introduce a second font family, or set headings/values in uppercase.",
+      "Don't spend gold on decoration — the moment it stops marking meaning, the lamp metaphor dies.",
+      "Don't nest a card inside a card."
+    ]
+  }
+}

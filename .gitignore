@@ -13,3 +13,11 @@ Thumbs.db
 
 # Streamlit secrets (if ever added)
 .streamlit/secrets.toml
+
+# Local agent/skill tooling (not app code)
+.agents/
+.claude/
+.codex/
+.gemini/
+skills-lock.json
+.impeccable/config.local.json

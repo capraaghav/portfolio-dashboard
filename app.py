@@ -26,6 +26,10 @@ from click_spark import click_spark
 from formatting import (
     fmt_inr, fmt_pct, fmt_num, fmt_int, fmt_mcap,
     REC_LABEL, SIGNAL_ORDER, GAIN, LOSS,
+    GOLD, BG, SURFACE, BORDER, TEXT, MUTED, GRID,
+    SIDEBAR, PANEL, HOVER, SELECTED, SHIMMER,
+    BORDER_HAIRLINE, BORDER_PANEL, BORDER_CONTROL,
+    INK_SOFT, MUTED_DEEP, DISABLED,
 )
 from parsers import parse_all
 
@@ -34,6 +38,22 @@ from parsers import parse_all
 st.set_page_config(page_title="Portfolio Dashboard", page_icon="📈",
                    layout="wide", initial_sidebar_state="expanded")
 
+# Palette → CSS custom properties, sourced from formatting.py (single source of
+# truth). The rules below reference var(--token) so colours are never re-typed here.
+st.markdown(f"""
+<style>
+:root {{
+  --bg: {BG}; --sidebar: {SIDEBAR}; --panel: {PANEL}; --surface: {SURFACE};
+  --hover: {HOVER}; --selected: {SELECTED}; --shimmer: {SHIMMER};
+  --border-hair: {BORDER_HAIRLINE}; --border-panel: {BORDER_PANEL};
+  --border-card: {BORDER}; --border-control: {BORDER_CONTROL};
+  --ink: {TEXT}; --ink-soft: {INK_SOFT}; --muted: {MUTED};
+  --muted-deep: {MUTED_DEEP}; --disabled: {DISABLED};
+  --gold: {GOLD}; --gain: {GAIN}; --loss: {LOSS};
+}}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -41,7 +61,7 @@ st.markdown("""
 html, body, .stApp, [data-testid="stAppViewContainer"], [class*="css"] {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
-.stApp { background: #0A0A0A; }
+.stApp { background: var(--bg); }
 .block-container { padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1400px; }
 /* hide menu/footer/deploy chrome — but NOT the whole toolbar (it holds the sidebar
    re-open button when the sidebar is collapsed) */
@@ -49,60 +69,70 @@ html, body, .stApp, [data-testid="stAppViewContainer"], [class*="css"] {
 /* always keep the sidebar collapse/expand control visible & on-brand */
 [data-testid="stSidebarCollapsedControl"], [data-testid="stSidebarCollapseButton"] {
   display: flex !important; visibility: visible !important; opacity: 1 !important; }
-[data-testid="stSidebarCollapsedControl"] svg, [data-testid="stSidebarCollapseButton"] svg { color: #C9A87A; }
-h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.01em; color: #EDEDED; }
-hr { border-color: #1c1c1c; }
+[data-testid="stSidebarCollapsedControl"] svg, [data-testid="stSidebarCollapseButton"] svg { color: var(--gold); }
+h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+hr { border-color: var(--border-hair); }
 
 /* ── Sidebar ── */
-[data-testid="stSidebar"] { background: #0C0C0C; border-right: 1px solid #1c1c1c; }
-.brand-title { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.18em; color: #C9A87A; padding-top: 0.3rem; }
-.brand-sub { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6b6b; margin-bottom: 0.5rem; }
+[data-testid="stSidebar"] { background: var(--sidebar); border-right: 1px solid var(--border-hair); }
+.brand-title { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.18em; color: var(--gold); padding-top: 0.3rem; }
+.brand-sub { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-deep); margin-bottom: 0.5rem; }
 [data-testid="stSidebar"] [role="radiogroup"] { gap: 2px; }
 [data-testid="stSidebar"] [role="radiogroup"] label {
   display: flex; align-items: center; width: 100%; padding: 0.5rem 0.7rem; margin: 0;
   border-radius: 10px; cursor: pointer; transition: background .15s; }
-[data-testid="stSidebar"] [role="radiogroup"] label:hover { background: #161616; }
+[data-testid="stSidebar"] [role="radiogroup"] label:hover { background: var(--hover); }
 [data-testid="stSidebar"] [role="radiogroup"] label > div:first-child { display: none; }
-[data-testid="stSidebar"] [role="radiogroup"] label p { font-size: 0.95rem; color: #b9b9b9; font-weight: 500; }
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) { background: #18170f; }
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p { color: #C9A87A; font-weight: 600; }
+[data-testid="stSidebar"] [role="radiogroup"] label p { font-size: 0.95rem; color: var(--ink-soft); font-weight: 500; }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) { background: var(--selected); }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p { color: var(--gold); font-weight: 600; }
 
 /* ── Metric → card ── */
 [data-testid="stMetric"] {
-  background: #141414; border: 1px solid #262626; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--border-card); border-radius: 14px;
   padding: 1rem 1.1rem; }
-[data-testid="stMetricLabel"] p { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; color: #8B8B8B; }
-[data-testid="stMetricValue"] { font-size: 1.65rem; font-weight: 700; color: #EDEDED; }
+[data-testid="stMetricLabel"] p { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; color: var(--muted); }
+[data-testid="stMetricValue"] { font-size: 1.65rem; font-weight: 700; color: var(--ink); }
 [data-testid="stMetricDelta"] { font-size: 0.9rem; }
 
 /* ── Bordered containers → cards ── */
 [data-testid="stVerticalBlockBorderWrapper"] {
-  background: #121212; border: 1px solid #232323 !important; border-radius: 16px; }
+  background: var(--panel); border: 1px solid var(--border-panel) !important; border-radius: 16px; }
 
 /* ── Hero ── */
 .hero { text-align: center; padding: 1.4rem 0 0.6rem; }
-.hero-label { text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.8rem; color: #8B8B8B; }
-.hero-value { font-size: 3.4rem; font-weight: 800; color: #C9A87A; line-height: 1.05; margin: 0.2rem 0; letter-spacing: -0.02em; }
+.hero-label { text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.8rem; color: var(--muted); }
+.hero-value { font-size: 3.4rem; font-weight: 800; color: var(--gold); line-height: 1.05; margin: 0.2rem 0; letter-spacing: -0.02em; }
 .hero-pnl { font-size: 1.15rem; font-weight: 600; }
-.hero-pnl-muted { color: #6b6b6b; font-weight: 500; }
-.hero-sub { color: #8B8B8B; font-size: 0.9rem; margin-top: 0.2rem; }
-.section-title { font-size: 1.5rem; font-weight: 700; color: #EDEDED; margin-bottom: 0.2rem; }
+.hero-pnl-muted { color: var(--muted-deep); font-weight: 500; }
+.hero-sub { color: var(--muted); font-size: 0.9rem; margin-top: 0.2rem; }
+.section-title { font-size: 1.5rem; font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; }
 
 /* tabs / buttons / dataframe */
-.stTabs [data-baseweb="tab-list"] { gap: 2px; flex-wrap: wrap; border-bottom: 1px solid #1c1c1c; }
+.stTabs [data-baseweb="tab-list"] { gap: 2px; flex-wrap: wrap; border-bottom: 1px solid var(--border-hair); }
 .stTabs [data-baseweb="tab"] { padding: 6px 14px; border-radius: 8px 8px 0 0; }
-.stTabs [aria-selected="true"] { color: #C9A87A; }
+.stTabs [aria-selected="true"] { color: var(--gold); }
 .stButton button, .stDownloadButton button {
-  border-radius: 10px; border: 1px solid #2a2a2a; background: #161616; color: #EDEDED; font-weight: 500; }
-.stButton button:hover, .stDownloadButton button:hover { border-color: #C9A87A; color: #C9A87A; }
+  border-radius: 10px; border: 1px solid var(--border-control); background: var(--hover); color: var(--ink); font-weight: 500; }
+.stButton button:hover, .stDownloadButton button:hover { border-color: var(--gold); color: var(--gold); }
+.stButton button:focus-visible, .stDownloadButton button:focus-visible {
+  outline: none; border-color: var(--gold); color: var(--gold);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent); }
 [data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
 
+/* ── Touch targets on coarse pointers (mobile/tablet) ── */
+@media (pointer: coarse) {
+  .stTabs [data-baseweb="tab"] { padding: 12px 16px; }
+  [data-testid="stSidebar"] [role="radiogroup"] label { padding: 0.75rem 0.8rem; }
+}
+
 /* ── Skeleton loaders ── */
-.sk { background: linear-gradient(90deg, #141414 25%, #1f1f1f 37%, #141414 63%);
+.sk { background: linear-gradient(90deg, var(--surface) 25%, var(--shimmer) 37%, var(--surface) 63%);
   background-size: 400% 100%; animation: sksh 1.4s ease infinite; border-radius: 8px; }
 @keyframes sksh { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
-.sk-card { background: #121212; border: 1px solid #232323; border-radius: 14px; padding: 1.1rem; }
+.sk-card { background: var(--panel); border: 1px solid var(--border-panel); border-radius: 14px; padding: 1.1rem; }
 .sk-row { display: flex; gap: 14px; margin: 1rem 0; }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
 </style>
 """, unsafe_allow_html=True)
 
@@ -124,7 +154,7 @@ _SKELETON = f"""
 """
 
 # Global click-spark effect (gold sparks radiate from every click)
-click_spark(spark_color="#C9A87A", spark_size=13, spark_radius=30, spark_count=9, duration=400)
+click_spark(spark_color=GOLD, spark_size=13, spark_radius=30, spark_count=9, duration=400)
 
 # ─── Backend: Supabase accounts (if configured) else local files ─────────────
 # When SUPABASE_URL + SUPABASE_ANON_KEY are in secrets, the app requires login and
@@ -170,6 +200,34 @@ def _wk52_pct(ticker, prices_map, fund_map):
     if all([low, high, price]) and high > low:
         return (price - low) / (high - low) * 100
     return np.nan
+
+
+def _pnl_styler(disp_df: pd.DataFrame, num_df: pd.DataFrame, cols):
+    """Tint directional value columns mint (gain) / coral (loss) by their numeric
+    sign, while the formatted strings keep their +/- so the meaning never relies on
+    colour alone (WCAG-safe). `disp_df` holds the formatted strings; `num_df` is the
+    aligned numeric source the sign is read from (same row order)."""
+    present = [c for c in cols if c in disp_df.columns and c in num_df.columns]
+
+    def _col(series):
+        out = []
+        for v in num_df[series.name].to_numpy():
+            if pd.notna(v) and v > 0:
+                out.append(f"color: {GAIN}")
+            elif pd.notna(v) and v < 0:
+                out.append(f"color: {LOSS}")
+            else:
+                out.append("")
+        return out
+
+    sty = disp_df.style
+    if present:
+        sty = sty.apply(_col, axis=0, subset=present)
+    return sty
+
+
+# Directional value columns that earn the mint/coral signal in tables
+_PNL_COLS = ["Gain/Loss (₹)", "Gain/Loss (%)", "Upside (%)"]
 
 
 def to_excel_bytes(holdings_df: pd.DataFrame, totals: dict) -> bytes:
@@ -582,21 +640,20 @@ elif section == "📋 Holdings":
         sort_col = st.selectbox("Sort by", ["Current Value (₹)", "Gain/Loss (₹)", "Gain/Loss (%)",
                                             "Shares", "Live Price (₹)", "Ticker"] + ta_opts + tgt_opts)
 
-    show_fund = st.checkbox("Show fundamentals (P/E, P/B, Mkt Cap, Beta, 52w)", value=False) if load_meta else False
-
-    # ── Category filters — selecting a value shows only matching holdings ──
+    # Secondary filters live in a popover so the data table leads the page, not the controls
     sectors_avail = sorted([s for s in holdings["Sector"].dropna().unique() if s])
     atypes_avail = sorted(set(asset_of.values()))
-    nf1, nf2, nf3 = st.columns(3)
-    sector_sel = nf1.selectbox("Sector", ["All sectors"] + sectors_avail)
-    type_sel = nf2.selectbox("Asset type", ["All types"] + atypes_avail)
-    trend_sel = nf3.selectbox(
-        "Trend", (["All trends"] + [s for s in SIGNAL_ORDER if s != "N/A"]) if ta_signals else ["All trends"],
-        disabled=not ta_signals,
-        help=None if ta_signals else "Turn on Technical analysis in the sidebar to filter by trend.")
-    in_all = (st.checkbox("🔗 Held in all accounts only", value=False,
-                          help="Show only stocks held in every selected account.")
-              if n_accounts > 1 else False)
+    with st.popover("⚙️ More filters", use_container_width=False):
+        sector_sel = st.selectbox("Sector", ["All sectors"] + sectors_avail)
+        type_sel = st.selectbox("Asset type", ["All types"] + atypes_avail)
+        trend_sel = st.selectbox(
+            "Trend", (["All trends"] + [s for s in SIGNAL_ORDER if s != "N/A"]) if ta_signals else ["All trends"],
+            disabled=not ta_signals,
+            help=None if ta_signals else "Turn on Technical analysis in the sidebar to filter by trend.")
+        show_fund = st.checkbox("Show fundamentals (P/E, P/B, Mkt Cap, Beta, 52w)", value=False) if load_meta else False
+        in_all = (st.checkbox("🔗 Held in all accounts only", value=False,
+                              help="Show only stocks held in every selected account.")
+                  if n_accounts > 1 else False)
 
     fr = raw[raw["account"].isin(sel_accounts)] if sel_accounts else raw
     fh = analytics.build_holdings(fr, prices, meta)
@@ -660,7 +717,7 @@ elif section == "📋 Holdings":
         disp["Beta"] = disp["Beta"].apply(lambda x: fmt_num(x, 2))
         disp["52w %"] = disp["52w %"].apply(lambda x: f"{x:.0f}%" if not pd.isna(x) else "—")
 
-    event = st.dataframe(disp, width='stretch', hide_index=True,
+    event = st.dataframe(_pnl_styler(disp, fh, _PNL_COLS), width='stretch', hide_index=True,
                          height=min(45 + 36 * len(disp), 600),
                          on_select="rerun", selection_mode="single-row",
                          key="holdings_table")
@@ -697,7 +754,7 @@ elif section == "📋 Holdings":
                 bdisp[col] = bdisp[col].apply(fmt_inr)
             bdisp["Gain/Loss (%)"] = bdisp["Gain/Loss (%)"].apply(fmt_pct)
             bdisp["Shares"] = bdisp["Shares"].apply(lambda x: f"{x:,.2f}" if not pd.isna(x) else "—")
-            st.dataframe(bdisp, width='stretch', hide_index=True)
+            st.dataframe(_pnl_styler(bdisp, bd, _PNL_COLS), width='stretch', hide_index=True)
 
     ec1, ec2 = st.columns([1, 4])
     with ec1:

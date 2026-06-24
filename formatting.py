@@ -10,11 +10,27 @@ GOLD = "#C9A87A"      # primary accent — brand, hero value, chart lines
 GAIN = "#3DDC97"      # positive (mint green)
 LOSS = "#F0564A"      # negative (coral red)
 BG = "#0A0A0A"        # app background
-SURFACE = "#141414"   # cards / panels
-BORDER = "#262626"    # card borders / dividers
+SURFACE = "#141414"   # cards / panels (metric cards)
+BORDER = "#262626"    # card borders / dividers (metric cards)
 TEXT = "#EDEDED"      # primary text
 MUTED = "#8B8B8B"     # secondary / labels
 GRID = "#1F1F1F"      # chart gridlines
+
+# ─── UI chrome ramp (dark tonal layering; single source for app.py CSS) ──────
+# Depth comes from these lightness steps, not shadows. Kept here so the CSS block,
+# charts, and components all read one palette. (config.toml necessarily repeats a
+# few of these — Streamlit reads theme statically and can't import Python.)
+SIDEBAR = "#0C0C0C"        # sidebar surface
+PANEL = "#121212"          # container cards (charts/tables wrapper)
+HOVER = "#161616"          # control / nav hover, secondary button bg
+SELECTED = "#18170F"       # gold-tinted black — active nav row
+SHIMMER = "#1F1F1F"        # skeleton-loader sweep highlight (== GRID)
+BORDER_HAIRLINE = "#1C1C1C"  # dividers, sidebar edge, tab underline
+BORDER_PANEL = "#232323"     # container-card border
+BORDER_CONTROL = "#2A2A2A"   # button / control border
+INK_SOFT = "#B9B9B9"       # nav label default
+MUTED_DEEP = "#808080"     # tertiary text floor (AA-safe, 5.0:1 on BG)
+DISABLED = "#555555"       # disabled glyphs / N-A (non-text only)
 
 SIGNAL_ORDER = ["Strong Bullish", "Bullish", "Neutral", "Bearish", "Strong Bearish", "N/A"]
 SIGNAL_COLOR = {
