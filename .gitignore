@@ -17,7 +17,8 @@ Thumbs.db
 # Local agent/skill tooling (not app code)
 .agents/
 .claude/
+.claude-flow/
 .codex/
 .gemini/
 skills-lock.json
-.impeccable/config.local.json
+.impeccable/
