@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<!--
+  impeccable-disable single-font cramped-padding
+  Two intentional/false-positive waivers for this standalone exported document:
+  - single-font: DESIGN.md "One Family Rule" mandates Inter as the sole typeface;
+    hierarchy is by weight (400-800), a second family is explicitly forbidden.
+  - cramped-padding: the privacy card's padding is clamp(1.6rem,4vw,2.6rem)
+    (~28-42px); the detector cannot resolve clamp() and misreads it as zero inset.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portfolio Dashboard — Everything you own, in one honest view</title>
+<meta name="description" content="Consolidate every Indian broker (NSE/BSE) into one honest dashboard. Runs locally — your holdings never leave your machine." />
+
+<!--
+  ============================================================================
+  CONFIG — swap these two placeholders before deploying.
+  APP_URL  : where "Launch dashboard" / "Open app" point (the live Streamlit app)
+  REPO_URL : the public GitHub repository link in the footer
+  Both are read by the tiny inline <script> at the bottom of this file and
+  written into every matching link. You can also just search-and-replace the
+  strings "#APP_URL" and "#REPO_URL" directly in the markup below.
+  ============================================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+<style>
+  /* ========================================================================
+     DESIGN TOKENS — "After-Hours Desk" (mirrors DESIGN.md / app.py exactly)
+     ======================================================================== */
+  :root {
+    /* canvas + panel steps */
+    --bg: #0A0A0A;
+    --sidebar: #0C0C0C;
+    --surface-container: #121212;
+    --surface: #141414;
+    --hover: #161616;
+    --selected: #18170F;
+    --shimmer: #1F1F1F;
+
+    /* hairline borders */
+    --border-hair: #1C1C1C;
+    --border-container: #232323;
+    --border-card: #262626;
+    --border-control: #2A2A2A;
+
+    /* ink ramp */
+    --ink: #EDEDED;
+    --ink-soft: #B9B9B9;
+    --muted: #8B8B8B;
+    --muted-deep: #808080;
+    --disabled: #555555;
+
+    /* the one lamp + P&L */
+    --gold: #C9A87A;
+    --gain: #3DDC97;
+    --gain-deep: #1F9E6B;
+    --loss: #F0564A;
+    --loss-deep: #A8362C;
+
+    /* gold focus ring */
+    --focus-ring: 0 0 0 2px color-mix(in srgb, var(--gold) 45%, transparent);
+
+    /* semantic z-index scale (no magic numbers) */
+    --z-base: 0;
+    --z-content: 1;
+    --z-sticky-header: 100;
+
+    --maxw: 1120px;
+    --ease: cubic-bezier(0.22, 0.61, 0.36, 1); /* ease-out, no overshoot */
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection { background: color-mix(in srgb, var(--gold) 30%, transparent); }
+
+  a { color: inherit; text-decoration: none; }
+
+  /* visible keyboard focus everywhere */
+  a:focus-visible,
+  button:focus-visible,
+  .focusable:focus-visible {
+    outline: none;
+    border-radius: 8px;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* ---- layout primitives ---- */
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  section { position: relative; z-index: var(--z-content); }
+
+  /* ---- type roles ---- */
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin: 0;
+  }
+  .display {
+    font-weight: 800;
+    font-size: clamp(2.1rem, 6vw, 3.4rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 0;
+  }
+  .section-title {
+    font-weight: 700;
+    font-size: clamp(1.5rem, 3.2vw, 1.9rem);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin: 0;
+  }
+  .lede {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    max-width: 60ch;
+  }
+
+  /* P&L helpers — color ALWAYS rides with sign + figure */
+  .gain { color: var(--gain); }
+  .loss { color: var(--loss); }
+
+  /* ========================================================================
+     BUTTONS / LINKS
+     ======================================================================== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.1rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border: 1px solid var(--border-control);
+    background: var(--hover);
+    color: var(--ink);
+    transition: color .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease);
+    cursor: pointer;
+  }
+  .btn:hover { color: var(--gold); border-color: var(--gold); }
+
+  /* The single primary CTA — the one place a button carries gold at rest,
+     held within the One Lamp budget (brand + hero figure + this CTA). */
+  .btn-primary {
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+  }
+  .btn-primary:hover {
+    background: color-mix(in srgb, var(--gold) 12%, transparent);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .link-arrow {
+    color: var(--ink-soft);
+    font-weight: 600;
+    transition: color .15s var(--ease);
+  }
+  .link-arrow:hover { color: var(--gold); }
+
+  /* ========================================================================
+     HEADER
+     ======================================================================== */
+  header.site {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky-header);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(120%) blur(8px);
+    border-bottom: 1px solid var(--border-hair);
+  }
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+  .brand {
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .nav-right { display: flex; align-items: center; gap: 1.25rem; }
+  .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+  .nav-links a {
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: color .15s var(--ease);
+  }
+  .nav-links a:hover { color: var(--gold); }
+
+  /* ========================================================================
+     HERO
+     ======================================================================== */
+  .hero { padding: clamp(4rem, 12vw, 8rem) 0 clamp(3rem, 8vw, 5rem); }
+  .hero .display { max-width: 16ch; }
+  .hero-figure { color: var(--gold); }
+  .hero .lede { margin: 1.4rem 0 2.2rem; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; }
+  .hero-meta {
+    margin-top: 2.6rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem 2.5rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .hero-meta b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ========================================================================
+     PRIVACY PROMISE
+     ======================================================================== */
+  .privacy {
+    margin: clamp(2rem, 5vw, 3rem) 0;
+  }
+  .privacy-card {
+    background: var(--surface-container);
+    border: 1px solid var(--border-container);
+    border-radius: 16px;
+    padding: 1.8rem;
+    padding: clamp(1.6rem, 4vw, 2.6rem);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: clamp(1.2rem, 3vw, 2.2rem);
+    align-items: start;
+  }
+  .privacy-mark {
+    width: 52px; height: 52px;
+    flex: none;
+    color: var(--gold);
+  }
+  .privacy-card h2 { margin: 0 0 0.7rem; }
+  .privacy-card p { margin: 0; color: var(--ink-soft); max-width: 62ch; }
+  .privacy-points {
+    list-style: none;
+    margin: 1.4rem 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.9rem 1.6rem;
+  }
+  .privacy-points li {
+    color: var(--ink-soft);
+    font-size: 0.92rem;
+    padding-left: 1.4rem;
+    position: relative;
+  }
+  .privacy-points li::before {
+    content: "";
+    position: absolute; left: 0; top: 0.55em;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--gold);
+  }
+
+  /* ========================================================================
+     BROKERS STRIP
+     ======================================================================== */
+  .brokers { padding: clamp(2.5rem, 6vw, 4rem) 0; }
+  .brokers .eyebrow { margin-bottom: 1.6rem; }
+  /*
+    Broker wordmarks are rendered as pure text below — monochrome at rest,
+    lifting to gold/ink on hover. NO external logo files are used.
+    To drop in real SVG logos later: create an /assets folder beside this file
+    and replace the wordmark text spans with image or inline-SVG elements.
+  */
+  .wm-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem 0.9rem;
+    align-items: stretch;
+  }
+  .wm {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.7rem 1.05rem;
+    border: 1px solid var(--border-hair);
+    border-radius: 10px;
+    background: var(--surface-container);
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    transition: color .15s var(--ease), border-color .15s var(--ease);
+  }
+  .wm:hover { color: var(--ink); border-color: var(--border-card); }
+  .wm-any {
+    color: var(--ink-soft);
+    border-style: dashed;
+    border-color: var(--border-card);
+  }
+  .wm-any:hover { color: var(--gold); border-color: var(--gold); }
+
+  /* ========================================================================
+     FEATURES — editorial / asymmetric, NOT an icon-card grid
+     ======================================================================== */
+  .features { padding: clamp(3rem, 7vw, 5rem) 0; }
+  .features-head { max-width: 56ch; margin-bottom: clamp(2rem, 5vw, 3.2rem); }
+  .features-head p { color: var(--ink-soft); margin: 0.9rem 0 0; }
+
+  .feature-rows {
+    display: grid;
+    gap: clamp(1.4rem, 3vw, 2rem);
+  }
+  /* a two-column editorial narrative: a lead label column + prose column,
+     with occasional wide "feature blocks" that span both. */
+  .frow {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: clamp(1rem, 3vw, 2.4rem);
+    padding-top: clamp(1.4rem, 3vw, 2rem);
+    border-top: 1px solid var(--border-hair);
+    align-items: start;
+  }
+  .frow h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .frow .frow-kicker {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--muted);
+  }
+  .frow p { margin: 0; color: var(--ink-soft); max-width: 64ch; }
+  .frow p + p { margin-top: 0.8rem; }
+  .frow strong { color: var(--ink); font-weight: 600; }
+
+  /* mixed-size blocks within a feature row */
+  .fblocks {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.9rem;
+    margin-top: 1.1rem;
+  }
+  .fblock {
+    background: var(--surface);
+    border: 1px solid var(--border-card);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+  }
+  .fblock .k {
+    font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.4rem;
+  }
+  .fblock .v { font-size: 0.98rem; font-weight: 600; color: var(--ink); margin: 0; }
+  .fblock p.desc { font-size: 0.85rem; color: var(--ink-soft); margin: 0.35rem 0 0; font-weight: 500; }
+
+  /* ========================================================================
+     SAMPLE DASHBOARD PREVIEW (pure HTML/CSS mock)
+     ======================================================================== */
+  .preview { padding: clamp(3rem, 7vw, 5rem) 0; }
+  .preview-head { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.8rem; }
+  .preview-head p { margin: 0.6rem 0 0; color: var(--ink-soft); max-width: 52ch; }
+
+  .mock {
+    background: var(--surface-container);
+    border: 1px solid var(--border-container);
+    border-radius: 16px;
+    padding: clamp(1.4rem, 4vw, 2.4rem);
+    position: relative;
+  }
+  .mock-tag {
+    position: absolute;
+    top: 1rem; right: 1.1rem;
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-deep);
+    border: 1px solid var(--border-hair);
+    border-radius: 999px;
+    padding: 0.25rem 0.6rem;
+  }
+  .mock-hero { text-align: center; padding: 1rem 0 1.6rem; }
+  .mock-hero .eyebrow { letter-spacing: 0.16em; }
+  .mock-value {
+    font-size: clamp(2.2rem, 7vw, 3.4rem);
+    font-weight: 800;
+    color: var(--gold);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0.3rem 0 0.4rem;
+  }
+  .mock-pnl { font-size: 1.1rem; font-weight: 600; }
+  .mock-pnl .muted { color: var(--muted-deep); font-weight: 500; }
+
+  /* treemap-ish grid */
+  .treemap {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-auto-rows: 46px;
+    gap: 6px;
+    margin: 0.4rem 0 1.6rem;
+  }
+  .tile {
+    border-radius: 8px;
+    padding: 0.5rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    border: 1px solid transparent;
+  }
+  .tile .t-sym { font-size: 0.72rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .tile .t-pnl { font-size: 0.66rem; font-weight: 600; }
+  /* mint = gain, coral = loss; tints kept low so the room stays dark */
+  .tile.up   { background: color-mix(in srgb, var(--gain) 16%, var(--surface)); border-color: color-mix(in srgb, var(--gain) 28%, transparent); }
+  .tile.up .t-pnl   { color: var(--gain); }
+  .tile.down { background: color-mix(in srgb, var(--loss) 16%, var(--surface)); border-color: color-mix(in srgb, var(--loss) 28%, transparent); }
+  .tile.down .t-pnl { color: var(--loss); }
+
+  .span-2 { grid-column: span 2; }
+  .span-3 { grid-column: span 3; }
+  .row-2 { grid-row: span 2; }
+
+  .mock-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.8rem;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border-card);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+  }
+  .metric-card .m-label {
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: 0.72rem; font-weight: 600; color: var(--muted);
+    margin: 0 0 0.45rem;
+  }
+  .metric-card .m-value { font-size: 1.4rem; font-weight: 700; color: var(--ink); margin: 0; }
+  .metric-card .m-delta { font-size: 0.82rem; font-weight: 600; margin: 0.3rem 0 0; }
+  .mock-cta { margin-top: 1.6rem; }
+
+  /* ========================================================================
+     CLOSING CTA
+     ======================================================================== */
+  .closing { padding: clamp(3.5rem, 8vw, 6rem) 0; text-align: center; }
+  .closing .display { max-width: 18ch; margin: 0 auto 1.2rem; }
+  .closing p { color: var(--ink-soft); max-width: 50ch; margin: 0 auto 2rem; }
+
+  /* ========================================================================
+     FOOTER
+     ======================================================================== */
+  footer.site {
+    border-top: 1px solid var(--border-hair);
+    padding: 2.6rem 0;
+  }
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1.4rem;
+    align-items: start;
+  }
+  .foot .brand { font-size: 0.95rem; }
+  .foot-note { color: var(--muted); font-size: 0.85rem; max-width: 44ch; margin: 0.6rem 0 0; }
+  .foot-links { display: flex; gap: 1.4rem; align-items: center; }
+  .foot-links a { color: var(--ink-soft); font-size: 0.9rem; transition: color .15s var(--ease); }
+  .foot-links a:hover { color: var(--gold); }
+  .foot-disclaimer {
+    margin-top: 2rem;
+    color: var(--muted-deep);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border-hair);
+    padding-top: 1.4rem;
+  }
+
+  /* ========================================================================
+     REVEAL ON SCROLL — content visible by default; JS only enhances.
+     Never gate visibility on JS (no blank-ship risk).
+     ======================================================================== */
+  .reveal { opacity: 1; transform: none; }
+  .js .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity .6s var(--ease), transform .6s var(--ease);
+  }
+  .js .reveal.in { opacity: 1; transform: none; }
+
+  /* ========================================================================
+     RESPONSIVE — structural collapse, not fluid type shrink
+     ======================================================================== */
+  @media (max-width: 760px) {
+    .nav-links { display: none; }
+    .privacy-card { grid-template-columns: 1fr; }
+    .frow { grid-template-columns: 1fr; gap: 0.7rem; }
+    .frow h3 { font-size: 1.1rem; }
+    .preview-head { align-items: start; }
+  }
+
+  /* reduced motion: instant, no transforms */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; animation: none !important; }
+    .js .reveal { opacity: 1 !important; transform: none !important; }
+  }
+</style>
+</head>
+
+<body>
+<!-- ========================================================================
+     HEADER
+     ======================================================================== -->
+<header class="site">
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="Portfolio Dashboard — home">PORTFOLIO</a>
+    <div class="nav-right">
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#privacy">Privacy</a>
+        <a href="#brokers">Brokers</a>
+        <a href="#features">Features</a>
+        <a href="#preview">Preview</a>
+      </nav>
+      <!-- APP_URL link -->
+      <a class="btn" href="#APP_URL" data-app-url>Open app</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <!-- ====================================================================
+       HERO
+       ==================================================================== -->
+  <section class="hero">
+    <div class="wrap">
+      <h1 class="display reveal">Everything you own,<br />in <span class="hero-figure">one honest view</span>.</h1>
+      <p class="lede reveal">
+        Consolidate every Indian broker — NSE and BSE, across all your accounts —
+        into a single dashboard. It runs locally on your machine, so your holdings
+        never leave it.
+      </p>
+      <div class="hero-actions reveal">
+        <!-- Primary CTA → APP_URL -->
+        <a class="btn btn-primary" href="#APP_URL" data-app-url>Launch dashboard →</a>
+        <a class="link-arrow" href="#features">See what you get →</a>
+      </div>
+      <div class="hero-meta reveal">
+        <span><b>9+</b> broker formats auto-detected</span>
+        <span><b>CSV · Excel · PDF</b> exports</span>
+        <span><b>Local-only</b> — no upload</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================================
+       PRIVACY PROMISE
+       ==================================================================== -->
+  <section class="privacy" id="privacy">
+    <div class="wrap">
+      <div class="privacy-card reveal">
+        <svg class="privacy-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 2.5l7 3v5.5c0 4.6-3 7.6-7 8.5-4-0.9-7-3.9-7-8.5V5.5l7-3z" />
+          <path d="M9 11.5l2 2 4-4.2" />
+        </svg>
+        <div>
+          <p class="eyebrow">The privacy promise</p>
+          <h2 class="section-title" style="margin-top:0.6rem;">Runs locally. Your holdings never leave your machine.</h2>
+          <p style="margin-top:0.9rem;">
+            The dashboard reads your broker export, computes everything on your own
+            computer, and stores it under a local <code>./data/</code> folder. The only
+            outbound network calls are to Yahoo Finance for live prices and
+            fundamentals — your positions, costs, and account names are never uploaded
+            anywhere.
+          </p>
+          <ul class="privacy-points">
+            <li>No portfolio data sent to any server</li>
+            <li>Outbound calls only to Yahoo Finance, for prices</li>
+            <li>Delete the local <code>data/</code> folder to reset completely</li>
+            <li>No account required to run it on your own machine</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================================
+       SUPPORTED BROKERS — monochrome text wordmark strip
+       ==================================================================== -->
+  <section class="brokers" id="brokers">
+    <div class="wrap reveal">
+      <p class="eyebrow">Reads your existing exports</p>
+      <!-- Wordmarks are plain text (no logo files). To use real SVGs later,
+           add an /assets folder and swap the spans below for image elements. -->
+      <div class="wm-strip">
+        <span class="wm">Zerodha</span>
+        <span class="wm">Groww</span>
+        <span class="wm">Upstox</span>
+        <span class="wm">Angel One</span>
+        <span class="wm">HDFC Securities</span>
+        <span class="wm">Reliance</span>
+        <span class="wm">IndusInd</span>
+        <span class="wm">IIFL</span>
+        <span class="wm wm-any">+ any CSV / Excel / PDF</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================================
+       FEATURES — editorial narrative (not an icon-card grid)
+       ==================================================================== -->
+  <section class="features" id="features">
+    <div class="wrap">
+      <div class="features-head reveal">
+        <h2 class="section-title">Lead with the picture. Pull in the depth.</h2>
+        <p>
+          The consolidated view comes first — then technicals, tax, risk, and analyst
+          layers are there the moment you want them, never dumped all at once.
+        </p>
+      </div>
+
+      <div class="feature-rows">
+
+        <article class="frow reveal">
+          <div>
+            <h3>One consolidated view</h3>
+            <span class="frow-kicker">Overview &amp; allocation</span>
+          </div>
+          <div>
+            <p>
+              Every account merges into a single picture. A <strong>treemap heatmap</strong>
+              sizes each position by value and colours it by profit and loss, alongside
+              allocation by stock and by sector — so concentration and drift read instantly.
+            </p>
+            <div class="fblocks">
+              <div class="fblock">
+                <p class="k">Allocation heatmap</p>
+                <p class="v">Size = value</p>
+                <p class="desc">Colour by P&amp;L, sign-labelled</p>
+              </div>
+              <div class="fblock">
+                <p class="k">Holdings table</p>
+                <p class="v">Search · sort · filter</p>
+                <p class="desc">Per-account breakdown, Excel export</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="frow reveal">
+          <div>
+            <h3>Performance you can trust</h3>
+            <span class="frow-kicker">Snapshots · XIRR · benchmark</span>
+          </div>
+          <div>
+            <p>
+              Daily <strong>snapshots</strong> build a value timeline over time.
+              <strong>XIRR</strong> computes the moment you add purchase dates, and a
+              <strong>benchmark backtest</strong> replays your current basket against
+              NIFTY 50, SENSEX, Bank Nifty, or Midcap — honestly labelled for what it is.
+            </p>
+          </div>
+        </article>
+
+        <article class="frow reveal">
+          <div>
+            <h3>Depth, on demand</h3>
+            <span class="frow-kicker">Technical · analyst · fundamentals</span>
+          </div>
+          <div>
+            <p>
+              Turn on the heavier analysis only when you want it: <strong>SMA 20/50/200
+              and RSI</strong> trend signals, 12-month <strong>analyst consensus targets</strong>
+              with upside, and per-stock fundamentals — P/E, P/B, market cap, beta, 52-week range.
+            </p>
+            <div class="fblocks">
+              <div class="fblock">
+                <p class="k">Technical signals</p>
+                <p class="v">SMA + RSI</p>
+                <p class="desc">Strong Bull → Strong Bear</p>
+              </div>
+              <div class="fblock">
+                <p class="k">Analyst targets</p>
+                <p class="v">Low / mean / high</p>
+                <p class="desc">Buy / Hold / Sell consensus</p>
+              </div>
+              <div class="fblock">
+                <p class="k">Stock detail</p>
+                <p class="v">1-year candlestick</p>
+                <p class="desc">Avg-cost line, news, dividends</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="frow reveal">
+          <div>
+            <h3>Tax, risk &amp; income</h3>
+            <span class="frow-kicker">LTCG/STCG · concentration · dividends</span>
+          </div>
+          <div>
+            <p>
+              A <strong>tax view</strong> splits LTCG and STCG (using Zerodha's long-term
+              quantity column) with estimated tax and harvesting candidates. A
+              <strong>risk view</strong> surfaces concentration, top-5 weight, effective
+              holdings, portfolio beta, and sector exposure. <strong>Dividends</strong>
+              report TTM income and yield per stock.
+            </p>
+            <p>
+              Tax figures are estimates, surfaced plainly — never dressed up as advice.
+            </p>
+          </div>
+        </article>
+
+        <article class="frow reveal">
+          <div>
+            <h3>Watchlist &amp; rebalancing</h3>
+            <span class="frow-kicker">Track · plan</span>
+          </div>
+          <div>
+            <p>
+              Keep a <strong>watchlist</strong> of stocks you don't own yet — live price,
+              day change, analyst target, saved locally. Set target weights and the
+              <strong>rebalance</strong> view shows drift and the exact ₹ to buy or sell
+              per holding. It only ever suggests — it never places an order or moves money.
+            </p>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================================
+       SAMPLE DASHBOARD PREVIEW — pure HTML/CSS, illustrative
+       ==================================================================== -->
+  <section class="preview" id="preview">
+    <div class="wrap">
+      <div class="preview-head reveal">
+        <div>
+          <h2 class="section-title">A glance at the desk</h2>
+          <p>
+            The overview leads with the one figure that matters, then the shape of what
+            you hold. This is illustrative sample data.
+          </p>
+        </div>
+      </div>
+
+      <div class="mock reveal" role="img"
+           aria-label="Sample dashboard: portfolio value 24,86,420 rupees, up 18.4 percent, with an allocation heatmap and metric cards.">
+        <span class="mock-tag">Sample data</span>
+
+        <div class="mock-hero">
+          <p class="eyebrow">Total portfolio value</p>
+          <p class="mock-value">₹24,86,420</p>
+          <p class="mock-pnl">
+            <span class="gain">▲ +18.4%</span>
+            <span class="muted">&nbsp;·&nbsp;+₹3,86,940 all-time</span>
+          </p>
+        </div>
+
+        <!-- treemap-ish grid: tiles tinted mint/coral by sign -->
+        <div class="treemap" aria-hidden="true">
+          <div class="tile up span-3 row-2">
+            <span class="t-sym">RELIANCE</span>
+            <span class="t-pnl">+12.6%</span>
+          </div>
+          <div class="tile up span-2">
+            <span class="t-sym">HDFCBANK</span>
+            <span class="t-pnl">+7.1%</span>
+          </div>
+          <div class="tile down">
+            <span class="t-sym">WIPRO</span>
+            <span class="t-pnl">−4.3%</span>
+          </div>
+          <div class="tile up span-2">
+            <span class="t-sym">INFY</span>
+            <span class="t-pnl">+9.8%</span>
+          </div>
+          <div class="tile down">
+            <span class="t-sym">PAYTM</span>
+            <span class="t-pnl">−6.1%</span>
+          </div>
+          <div class="tile up span-2">
+            <span class="t-sym">TCS</span>
+            <span class="t-pnl">+22.4%</span>
+          </div>
+          <div class="tile up">
+            <span class="t-sym">ITC</span>
+            <span class="t-pnl">+3.0%</span>
+          </div>
+          <div class="tile down span-2">
+            <span class="t-sym">ZOMATO</span>
+            <span class="t-pnl">−1.9%</span>
+          </div>
+          <div class="tile up">
+            <span class="t-sym">SBIN</span>
+            <span class="t-pnl">+5.5%</span>
+          </div>
+        </div>
+
+        <div class="mock-metrics">
+          <div class="metric-card">
+            <p class="m-label">Invested</p>
+            <p class="m-value">₹20,99,480</p>
+            <p class="m-delta gain">+₹3,86,940</p>
+          </div>
+          <div class="metric-card">
+            <p class="m-label">Day change</p>
+            <p class="m-value">₹14,210</p>
+            <p class="m-delta gain">▲ +0.57%</p>
+          </div>
+          <div class="metric-card">
+            <p class="m-label">XIRR</p>
+            <p class="m-value">16.2%</p>
+            <p class="m-delta gain">+4.1% vs NIFTY</p>
+          </div>
+          <div class="metric-card">
+            <p class="m-label">Top-5 weight</p>
+            <p class="m-value">61.4%</p>
+            <p class="m-delta" style="color:var(--muted);">9 effective holdings</p>
+          </div>
+        </div>
+
+        <div class="mock-cta">
+          <!-- Sample-data CTA → APP_URL (opens the app, no app changes) -->
+          <a class="btn btn-primary" href="#APP_URL" data-app-url>Open it with your own data →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================================
+       CLOSING CTA
+       ==================================================================== -->
+  <section class="closing">
+    <div class="wrap reveal">
+      <h2 class="display">Drop in a broker export. See the truth.</h2>
+      <p>
+        No setup ritual, no upload. Open the dashboard, hand it a file, and read what
+        you actually own.
+      </p>
+      <a class="btn btn-primary" href="#APP_URL" data-app-url>Launch dashboard →</a>
+    </div>
+  </section>
+</main>
+
+<!-- ========================================================================
+     FOOTER
+     ======================================================================== -->
+<footer class="site">
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <div class="brand">PORTFOLIO</div>
+        <p class="foot-note">
+          Runs locally — your holdings never leave your machine. The only outbound
+          calls are to Yahoo Finance for prices.
+        </p>
+      </div>
+      <nav class="foot-links" aria-label="Footer">
+        <!-- REPO_URL link -->
+        <a href="#REPO_URL" data-repo-url>GitHub</a>
+        <a href="#APP_URL" data-app-url>Open app</a>
+        <a href="#privacy">Privacy</a>
+      </nav>
+    </div>
+    <p class="foot-disclaimer">
+      For informational purposes only. Tax figures and analyst targets are estimates,
+      not investment advice — verify with a qualified professional before acting.
+    </p>
+  </div>
+</footer>
+
+<script>
+  /* ======================================================================
+     CONFIG — edit these two constants, nothing else, to wire up the page.
+     ====================================================================== */
+  const APP_URL  = "https://portfolio-dashboard-1.streamlit.app/";   // TODO: replace with the live dashboard URL
+  const REPO_URL = "https://github.com/capraaghav/portfolio-dashboard";  // TODO: replace with the public GitHub repo URL
+
+  (function () {
+    // Wire the placeholder links from the constants above.
+    document.querySelectorAll("[data-app-url]").forEach(function (a) {
+      a.setAttribute("href", APP_URL);
+      if (APP_URL.charAt(0) !== "#") { a.setAttribute("rel", "noopener"); }
+    });
+    document.querySelectorAll("[data-repo-url]").forEach(function (a) {
+      a.setAttribute("href", REPO_URL);
+      if (REPO_URL.charAt(0) !== "#") {
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener noreferrer");
+      }
+    });
+
+    // Progressive enhancement: mark the document so reveal styles apply only
+    // when JS + IntersectionObserver are available. Content is visible without it.
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) return;
+
+    document.documentElement.classList.add("js");
+
+    var els = document.querySelectorAll(".reveal");
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry, i) {
+        if (entry.isIntersecting) {
+          var el = entry.target;
+          // gentle stagger within a viewport batch
+          el.style.transitionDelay = Math.min(i * 70, 280) + "ms";
+          el.classList.add("in");
+          io.unobserve(el);
+        }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+
+    els.forEach(function (el) { io.observe(el); });
+  })();
+</script>
+</body>
+</html>
