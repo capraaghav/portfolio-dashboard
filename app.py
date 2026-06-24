@@ -249,9 +249,15 @@ def to_excel_bytes(holdings_df: pd.DataFrame, totals: dict) -> bytes:
 
 # ─── Click-through navigation (Technical chart/table → Stock Detail) ──────────
 
-def _go_to_detail(ticker: str) -> None:
-    """Jump to the Stock Detail section for `ticker`. Sets the sidebar nav + the
-    detail picker (both read these on the next run) and reruns."""
+def _go_to_detail(ticker: str | None, guard: str) -> None:
+    """Jump to the Stock Detail section for `ticker` (a click-through from another
+    surface). `guard` is a per-source session-state key holding the last ticker that
+    triggered navigation: a stale selection still sitting in a widget's state must not
+    bounce the user straight back out when they return to this tab, so we navigate only
+    on a *new* selection. No-op when there's no ticker or it's unchanged."""
+    if not ticker or st.session_state.get(guard) == ticker:
+        return
+    st.session_state[guard] = ticker
     st.session_state["_goto_section"] = "🔍 Stock Detail"
     st.session_state["_goto_ticker"] = ticker
     st.rerun()
@@ -906,10 +912,17 @@ elif section == "🔬 Technical":
             except ValueError:
                 return None
 
-        valid = [t for t in ta_signals if ta_signals[t].get("signal", "N/A") != "N/A"]
+        # vs-50MA% is stored as a display string ("+3.4%"); parse each once per rerun
+        # so the sort key, headline count, and table all read a number, not re-parse.
+        vs50 = {t: _vs50f(t) for t in ta_signals}
+
+        valid = []
         counts = {s: 0 for s in SIGNAL_ORDER}
-        for t in ta_signals:
-            counts[ta_signals[t].get("signal", "N/A")] = counts.get(ta_signals[t].get("signal", "N/A"), 0) + 1
+        for t, sig in ta_signals.items():
+            s = sig.get("signal", "N/A")
+            counts[s] = counts.get(s, 0) + 1
+            if s != "N/A":
+                valid.append(t)
 
         # ── Mood: 5 count cards + distribution bar + headline ──
         cc = st.columns(5)
@@ -923,7 +936,7 @@ elif section == "🔬 Technical":
         if total:
             n_bull = counts["Strong Bullish"] + counts["Bullish"]
             n_bear = counts["Strong Bearish"] + counts["Bearish"]
-            above50 = sum(1 for t in valid if (_vs50f(t) or 0) > 0)
+            above50 = sum(1 for t in valid if (vs50[t] or 0) > 0)
             mood = "leans bullish" if n_bull > n_bear else ("leans bearish" if n_bear > n_bull else "is mixed")
             st.markdown(f"Portfolio **{mood}** — **{above50} of {total}** holdings trade above their 50-day average.")
 
@@ -937,7 +950,7 @@ elif section == "🔬 Technical":
                               help="Off shows the ~16 most extreme; on shows every holding.")
 
         if sort_by.startswith("Most extreme"):
-            keyed = sorted(valid, key=lambda t: (_vs50f(t) if _vs50f(t) is not None else 0.0))
+            keyed = sorted(valid, key=lambda t: (vs50[t] or 0.0))
         elif sort_by == "RSI":
             keyed = sorted(valid, key=lambda t: (ta_signals[t].get("rsi")
                            if pd.notna(ta_signals[t].get("rsi")) else 0.0))
@@ -958,29 +971,21 @@ elif section == "🔬 Technical":
             if f:
                 ev = st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False},
                                      on_select="rerun", selection_mode="points", key="ta_vs50_chart")
-                _ct = _plotly_clicked_ticker(ev)
-                # Only navigate on a *new* selection so returning to this tab (with the
-                # old selection still in widget state) doesn't bounce us straight back out.
-                if _ct and st.session_state.get("_ta_vs50_last") != _ct:
-                    st.session_state["_ta_vs50_last"] = _ct
-                    _go_to_detail(_ct)
+                _go_to_detail(_plotly_clicked_ticker(ev), "_ta_vs50_last")
         with b2:
             st.markdown("**RSI (14-day)**")
             f = charts.rsi_bar(sub, order)
             if f:
                 ev = st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False},
                                      on_select="rerun", selection_mode="points", key="ta_rsi_chart")
-                _ct = _plotly_clicked_ticker(ev)
-                if _ct and st.session_state.get("_ta_rsi_last") != _ct:
-                    st.session_state["_ta_rsi_last"] = _ct
-                    _go_to_detail(_ct)
+                _go_to_detail(_plotly_clicked_ticker(ev), "_ta_rsi_last")
 
         # ── Searchable, sortable signal table (all holdings) ──
         st.divider()
         st.markdown("**All signals**")
         ta_q = st.text_input("Search ticker", key="ta_search", placeholder="e.g. RELIANCE")
         trows = [{"Ticker": t, "Trend": ta_signals[t]["label"],
-                  "RSI": ta_signals[t]["rsi"], "vs 50MA (%)": _vs50f(t)} for t in valid]
+                  "RSI": ta_signals[t]["rsi"], "vs 50MA (%)": vs50[t]} for t in valid]
         tdf = pd.DataFrame(trows).sort_values("vs 50MA (%)", ascending=False, na_position="last")
         if ta_q:
             tdf = tdf[tdf["Ticker"].str.contains(ta_q.strip().upper())]
@@ -995,23 +1000,15 @@ elif section == "🔬 Technical":
                 return f"color: {LOSS}"
             return f"color: {MUTED}"
 
-        def _vs_color(_series):
-            return [f"color: {GAIN}" if (pd.notna(v) and v > 0)
-                    else (f"color: {LOSS}" if (pd.notna(v) and v < 0) else "")
-                    for v in tdf["vs 50MA (%)"].to_numpy()]
-
-        tsty = (tdisp.style
-                .apply(_vs_color, axis=0, subset=["vs 50MA (%)"])
-                .map(_trend_color, subset=["Trend"]))
+        # "vs 50MA (%)" is a directional value column → reuse the shared sign-tint
+        # styler (mint/coral by numeric sign, read off the aligned numeric `tdf`).
+        tsty = _pnl_styler(tdisp, tdf, ["vs 50MA (%)"]).map(_trend_color, subset=["Trend"])
         tev = st.dataframe(tsty, width='stretch', hide_index=True,
                            height=min(45 + 36 * len(tdisp), 520),
                            on_select="rerun", selection_mode="single-row", key="ta_signal_table")
         _trows = list(tev.selection.rows) if (tev and tev.selection) else []
         if _trows and _trows[0] < len(tdf):
-            _ct = tdf.iloc[_trows[0]]["Ticker"]
-            if st.session_state.get("_ta_row_last") != _ct:
-                st.session_state["_ta_row_last"] = _ct
-                _go_to_detail(_ct)
+            _go_to_detail(tdf.iloc[_trows[0]]["Ticker"], "_ta_row_last")
 
 
 # ═══ ANALYSTS ═════════════════════════════════════════════════════════════════

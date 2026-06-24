@@ -7,7 +7,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from formatting import SIGNAL_COLOR, REC_COLOR, GAIN, LOSS, GOLD, MUTED, TEXT, BORDER, GRID
+from formatting import (SIGNAL_COLOR, SIGNAL_ORDER, REC_COLOR, GAIN, LOSS, GOLD, MUTED,
+                        TEXT, BORDER, GRID, BG)
 
 _MARGIN = dict(t=50, b=10, l=10, r=10)
 _FONT = "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
@@ -156,7 +157,7 @@ def rsi_bar(ta_signals: dict, order: list | None = None) -> go.Figure | None:
 
 def signal_distribution_bar(counts: dict) -> go.Figure | None:
     """Single stacked horizontal bar: portfolio trend mix, bull→bear, by proportion."""
-    seq = ["Strong Bullish", "Bullish", "Neutral", "Bearish", "Strong Bearish"]
+    seq = [s for s in SIGNAL_ORDER if s != "N/A"]   # bull→bear, excluding the N/A bucket
     present = [(s, counts.get(s, 0)) for s in seq if counts.get(s, 0) > 0]
     if not present:
         return None
@@ -165,7 +166,7 @@ def signal_distribution_bar(counts: dict) -> go.Figure | None:
         fig.add_bar(y=[""], x=[c], orientation="h", name=s,
                     marker=dict(color=SIGNAL_COLOR[s], line=dict(width=0)),
                     text=str(c), textposition="inside", insidetextanchor="middle",
-                    textfont=dict(color="#0A0A0A", size=12),
+                    textfont=dict(color=BG, size=12),
                     hovertemplate=f"{s}: {c}<extra></extra>")
     fig.update_layout(barmode="stack", height=58, showlegend=False, bargap=0,
                       title_text="", margin=dict(t=2, b=2, l=2, r=2),
