@@ -185,35 +185,28 @@ if MULTIUSER:
     storage.configure(Path(tempfile.gettempdir()) / "portfolio_sessions" / st.session_state["_sid"])
 
 
-def render_landing() -> None:
-    """Landing / welcome screen. Embeds the standalone index.html verbatim via a
-    Streamlit HTML component, so the in-app welcome looks EXACTLY like the marketing
-    page — same markup, styles, fonts, and reveal animations (the component renders in
-    an iframe that runs the page's JS, unlike st.markdown which strips scripts). Shown
-    to logged-out users above the auth form, and to logged-in users before they upload."""
-    import streamlit.components.v1 as components
-    _html = (Path(__file__).parent / "index.html").read_text(encoding="utf-8")
-    components.html(_html, height=4400, scrolling=True)
-
-
-# Auth gate. Logged-out visitors get a compact hero + the login form up top (so
-# returning users can sign in without scrolling), then the full landing below.
-if USE_DB:
-    if not db.current_user():
-        st.markdown("""
-<div style="max-width:920px;margin:0 auto;text-align:center;padding:0.6rem 0 0.2rem;">
+def render_landing(subline: str) -> None:
+    """Compact in-app hero. The full marketing landing is the standalone index.html
+    page (hosted separately) — embedding it here nested the app inside itself, so the
+    app just shows this hero above the login form / upload prompt."""
+    st.markdown(f"""
+<div style="max-width:920px;margin:0 auto;text-align:center;padding:1rem 0 0.3rem;">
   <div style="text-transform:uppercase;letter-spacing:0.16em;font-size:0.78rem;color:var(--muted);">
     Portfolio · Indian Markets · NSE / BSE</div>
-  <div style="font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;line-height:1.08;
+  <div style="font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;line-height:1.08;
     letter-spacing:-0.02em;color:var(--ink);margin:0.4rem 0 0.3rem;">
     Everything you own, <span style="color:var(--gold);">in one honest view.</span></div>
-  <div style="color:var(--ink-soft);font-size:1rem;">
-    Sign in below — or scroll down to see what it does.</div>
+  <div style="color:var(--ink-soft);font-size:1rem;">{subline}</div>
 </div>
 """, unsafe_allow_html=True)
+
+
+# Auth gate. Logged-out visitors get a compact hero + the login form. The full
+# marketing page lives separately at index.html (its CTA opens this app).
+if USE_DB:
+    if not db.current_user():
+        render_landing("Sign in below to get started.")
         db.render_auth()
-        st.divider()
-        render_landing()   # full index.html landing beneath the form
         st.stop()
     db.persist_cookie()   # (re)write the refresh-token cookie each logged-in run
 
@@ -422,7 +415,7 @@ elif use_saved or st.session_state.get("_use_saved"):
     raw = store.load_session()
 
 if raw is None or raw.empty:
-    render_landing()
+    render_landing("⚙️ Open <b>Upload / Data</b> in the sidebar and drop your broker file to begin.")
     st.stop()
 
 # ─── Resolve symbols (some brokers store the full company name or only an ISIN) ─
