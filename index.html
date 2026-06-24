@@ -531,6 +531,8 @@
     .frow { grid-template-columns: 1fr; gap: 0.7rem; }
     .frow h3 { font-size: 1.1rem; }
     .preview-head { align-items: start; }
+    /* a11y: 44px minimum tap target for the footer text links on touch */
+    .foot-links a { min-height: 44px; display: inline-flex; align-items: center; }
   }
 
   /* reduced motion: instant, no transforms */
