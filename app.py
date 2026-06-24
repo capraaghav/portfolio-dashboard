@@ -247,6 +247,25 @@ def to_excel_bytes(holdings_df: pd.DataFrame, totals: dict) -> bytes:
     return buf.getvalue()
 
 
+# ─── Click-through navigation (Technical chart/table → Stock Detail) ──────────
+
+def _go_to_detail(ticker: str) -> None:
+    """Jump to the Stock Detail section for `ticker`. Sets the sidebar nav + the
+    detail picker (both read these on the next run) and reruns."""
+    st.session_state["_goto_section"] = "🔍 Stock Detail"
+    st.session_state["_goto_ticker"] = ticker
+    st.rerun()
+
+
+def _plotly_clicked_ticker(ev) -> str | None:
+    """Pull the clicked bar's ticker (its x category) from a plotly selection event."""
+    try:
+        pts = ev.selection["points"] if (ev and ev.selection) else []
+    except Exception:
+        pts = []
+    return pts[0].get("x") if pts else None
+
+
 # ─── Sidebar: brand + navigation + upload/data ───────────────────────────────
 
 SECTIONS = ["📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical", "🎯 Analysts",
@@ -278,6 +297,10 @@ with st.sidebar:
                     st.rerun()
                 else:
                     st.error(err)
+    # A click-through from another tab (e.g. Technical) parks the target section
+    # here; apply it before the radio instantiates so it lands selected.
+    if "_goto_section" in st.session_state:
+        st.session_state["nav"] = st.session_state.pop("_goto_section")
     section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
     st.divider()
 
@@ -927,17 +950,30 @@ elif section == "🔬 Technical":
             order = keyed
         sub = {t: ta_signals[t] for t in order}
 
+        st.caption("💡 Click any bar or table row to open that stock's detailed analysis.")
         b1, b2 = st.columns(2)
         with b1:
             st.markdown("**Price vs 50-Day MA (%)**")
             f = charts.vs_50ma_bar(sub, order)
             if f:
-                st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+                ev = st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False},
+                                     on_select="rerun", selection_mode="points", key="ta_vs50_chart")
+                _ct = _plotly_clicked_ticker(ev)
+                # Only navigate on a *new* selection so returning to this tab (with the
+                # old selection still in widget state) doesn't bounce us straight back out.
+                if _ct and st.session_state.get("_ta_vs50_last") != _ct:
+                    st.session_state["_ta_vs50_last"] = _ct
+                    _go_to_detail(_ct)
         with b2:
             st.markdown("**RSI (14-day)**")
             f = charts.rsi_bar(sub, order)
             if f:
-                st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+                ev = st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False},
+                                     on_select="rerun", selection_mode="points", key="ta_rsi_chart")
+                _ct = _plotly_clicked_ticker(ev)
+                if _ct and st.session_state.get("_ta_rsi_last") != _ct:
+                    st.session_state["_ta_rsi_last"] = _ct
+                    _go_to_detail(_ct)
 
         # ── Searchable, sortable signal table (all holdings) ──
         st.divider()
@@ -967,8 +1003,15 @@ elif section == "🔬 Technical":
         tsty = (tdisp.style
                 .apply(_vs_color, axis=0, subset=["vs 50MA (%)"])
                 .map(_trend_color, subset=["Trend"]))
-        st.dataframe(tsty, width='stretch', hide_index=True,
-                     height=min(45 + 36 * len(tdisp), 520))
+        tev = st.dataframe(tsty, width='stretch', hide_index=True,
+                           height=min(45 + 36 * len(tdisp), 520),
+                           on_select="rerun", selection_mode="single-row", key="ta_signal_table")
+        _trows = list(tev.selection.rows) if (tev and tev.selection) else []
+        if _trows and _trows[0] < len(tdf):
+            _ct = tdf.iloc[_trows[0]]["Ticker"]
+            if st.session_state.get("_ta_row_last") != _ct:
+                st.session_state["_ta_row_last"] = _ct
+                _go_to_detail(_ct)
 
 
 # ═══ ANALYSTS ═════════════════════════════════════════════════════════════════
@@ -1165,12 +1208,23 @@ elif section == "🔍 Stock Detail":
     st.subheader("Stock Detail")
     # Only stocks with live Yahoo data have charts/news/fundamentals
     detail_options = [t for t in holdings["Ticker"].tolist() if t in yahoo_eligible]
+
+    # A click-through from the Technical tab lands here. If that stock has live
+    # Yahoo data, preselect it; otherwise say why there's nothing to show.
+    _goto = st.session_state.pop("_goto_ticker", None)
+    if _goto and _goto not in detail_options:
+        st.info(f"**{_goto}** has no live Yahoo market data (mutual fund, bond, or unresolved "
+                "ticker), so there's no detailed analysis to show.")
+        _goto = None
+
     if not detail_options:
         st.info("No live-priced equities to show detail for (mutual funds, bonds, and unresolved "
                 "tickers don't have Yahoo market data).")
         pick = None
     else:
-        pick = st.selectbox("Select a holding", detail_options)
+        if _goto:
+            st.session_state["detail_pick"] = _goto
+        pick = st.selectbox("Select a holding", detail_options, key="detail_pick")
     if pick:
         row = holdings[holdings["Ticker"] == pick].iloc[0]
         suffix = suffix_map.get(pick, ".NS")
