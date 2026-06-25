@@ -116,6 +116,10 @@
   .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
 
   section { position: relative; z-index: var(--z-content); }
+  /* offset in-page anchor jumps so the sticky header doesn't cover the heading */
+  section[id] { scroll-margin-top: 5rem; }
+  /* aligned, non-jittery figures — Inter's tabular numerals on all the sample data */
+  .mock-value, .mock-pnl, .t-pnl, .m-value, .m-delta { font-variant-numeric: tabular-nums; }
 
   /* ---- type roles ---- */
   .eyebrow {
@@ -133,6 +137,7 @@
     letter-spacing: -0.02em;
     color: var(--ink);
     margin: 0;
+    text-wrap: balance;
   }
   .section-title {
     font-weight: 700;
@@ -141,6 +146,7 @@
     letter-spacing: -0.01em;
     color: var(--ink);
     margin: 0;
+    text-wrap: balance;
   }
   .lede {
     color: var(--ink-soft);
@@ -170,6 +176,7 @@
     cursor: pointer;
   }
   .btn:hover { color: var(--gold); border-color: var(--gold); }
+  .btn:active { transform: translateY(1px); }
 
   /* The single primary CTA — the one place a button carries gold at rest,
      held within the One Lamp budget (brand + hero figure + this CTA). */
