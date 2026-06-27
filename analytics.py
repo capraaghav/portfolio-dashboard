@@ -405,3 +405,60 @@ def rebalance_plan(holdings: pd.DataFrame, targets: dict) -> pd.DataFrame:
             "Action (₹)": delta,
         })
     return pd.DataFrame(rows)
+
+
+# ─── Screener analytics ───────────────────────────────────────────────────────
+
+def calculate_sma(series: pd.Series, period: int) -> float:
+    if len(series) < period:
+        return np.nan
+    return float(series.rolling(period).mean().iloc[-1])
+
+
+def calculate_screening_metrics(
+    closes_dict: dict,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Compute SMA10, SMA50, RSI14, distance_pct, wk52 for each ticker.
+
+    Returns (metrics_df, skipped_list). Skips tickers with < 60 closes.
+    metrics_df columns: ticker, price, sma10, sma50, rsi, distance_pct,
+                        sma10_above, wk52_high, wk52_low
+    """
+    rows = []
+    skipped = []
+    for ticker, closes in closes_dict.items():
+        closes = closes.dropna()
+        if len(closes) < 60:
+            skipped.append(ticker)
+            continue
+        try:
+            price = float(closes.iloc[-1])
+            sma10 = calculate_sma(closes, 10)
+            sma50 = calculate_sma(closes, 50)
+            rsi_val = rsi(closes)
+            if np.isnan(sma10) or np.isnan(sma50) or sma50 == 0:
+                skipped.append(ticker)
+                continue
+            distance_pct = abs(sma10 - sma50) / sma50 * 100
+            sma10_above = bool(sma10 >= sma50)
+            window = closes.iloc[-252:] if len(closes) >= 252 else closes
+            wk52_high = float(window.max())
+            wk52_low = float(window.min())
+            rows.append({
+                "ticker": ticker,
+                "price": price,
+                "sma10": round(sma10, 2),
+                "sma50": round(sma50, 2),
+                "rsi": rsi_val,
+                "distance_pct": round(distance_pct, 3),
+                "sma10_above": sma10_above,
+                "wk52_high": round(wk52_high, 2),
+                "wk52_low": round(wk52_low, 2),
+            })
+        except Exception:
+            skipped.append(ticker)
+    df = pd.DataFrame(rows) if rows else pd.DataFrame(
+        columns=["ticker", "price", "sma10", "sma50", "rsi",
+                 "distance_pct", "sma10_above", "wk52_high", "wk52_low"]
+    )
+    return df, skipped

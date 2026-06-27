@@ -560,3 +560,67 @@ def fetch_benchmark(symbol: str, period: str = "1y") -> pd.Series:
         return hist["Close"].dropna()
     except Exception:
         return pd.Series(dtype=float)
+
+
+# ─── Universe lists for Screener ─────────────────────────────────────────────
+
+UNIVERSE_URLS = {
+    "Nifty 500": "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv",
+    "Nifty 50":  "https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv",
+}
+
+# Static fallback — used when NSE is unreachable. Covers ~50 liquid large-caps.
+_NIFTY50_FALLBACK = [
+    "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "ITC",
+    "SBIN", "BHARTIARTL", "KOTAKBANK", "LT", "AXISBANK", "ASIANPAINT", "MARUTI",
+    "TITAN", "SUNPHARMA", "WIPRO", "ULTRACEMCO", "BAJFINANCE", "HCLTECH",
+    "POWERGRID", "NTPC", "NESTLEIND", "TECHM", "INDUSINDBK", "ONGC", "TATAMOTORS",
+    "ADANIENT", "BAJAJFINSV", "COALINDIA", "DIVISLAB", "DRREDDY", "EICHERMOT",
+    "GRASIM", "HEROMOTOCO", "HINDALCO", "JSWSTEEL", "M&M", "SBILIFE",
+    "BRITANNIA", "CIPLA", "BPCL", "APOLLOHOSP", "TATACONSUM", "HDFCLIFE",
+    "ADANIPORTS", "LTIM", "BAJAJ-AUTO", "UPL", "TATASTEEL",
+]
+
+_NIFTY500_FALLBACK = _NIFTY50_FALLBACK  # trimmed fallback; real list loads from NSE
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_universe(name: str) -> list[str]:
+    """Return bare NSE symbols for a named universe. Cached 24h.
+    Falls back to a static list if NSE is unreachable."""
+    url = UNIVERSE_URLS.get(name)
+    if not url:
+        return _NIFTY50_FALLBACK
+    try:
+        r = _yahoo_session().get(url, timeout=20)
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.text))
+        df.columns = [c.strip() for c in df.columns]
+        sym_col = next(
+            (c for c in df.columns if c.upper() in ("SYMBOL", "SYMBOLS")), None
+        )
+        if sym_col is None:
+            sym_col = df.columns[0]
+        symbols = (
+            df[sym_col]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            .unique()
+            .tolist()
+        )
+        symbols = [s for s in symbols if s and len(s) <= 20]
+        return symbols if symbols else _NIFTY50_FALLBACK
+    except Exception:
+        fallback = _NIFTY500_FALLBACK if "500" in name else _NIFTY50_FALLBACK
+        return fallback
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_screener_history(tickers: tuple, _suffix_map: dict, period: str = "200d") -> dict:
+    """Bulk-download closing prices for screener universe. Cached 1h.
+    Returns {ticker: close_series}. Wraps _download_closes()."""
+    if not tickers:
+        return {}
+    return _download_closes(tickers, _suffix_map, period)

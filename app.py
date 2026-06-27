@@ -21,6 +21,7 @@ import charts
 import db
 import market_data as md
 import parsers
+import screener as scr
 import storage
 from click_spark import click_spark
 from formatting import (
@@ -300,8 +301,8 @@ def _plotly_clicked_ticker(ev) -> str | None:
 
 # ─── Sidebar: brand + navigation + upload/data ───────────────────────────────
 
-SECTIONS = ["📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical", "🎯 Analysts",
-            "🧮 Tax", "⚠️ Risk", "💰 Dividends", "🔍 Stock Detail", "👁️ Watchlist", "⚖️ Rebalance"]
+SECTIONS = ["📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical", "🔎 Screener",
+            "🎯 Analysts", "🧮 Tax", "⚠️ Risk", "💰 Dividends", "🔍 Stock Detail", "👁️ Watchlist", "⚖️ Rebalance"]
 
 with st.sidebar:
     st.markdown('<div class="brand-title">PORTFOLIO</div>'
@@ -415,6 +416,189 @@ elif use_saved or st.session_state.get("_use_saved"):
     # interactions don't drop the data.
     st.session_state["_use_saved"] = True
     raw = store.load_session()
+
+if section == "🔎 Screener":
+    st.markdown('<p class="section-title">🔎 Screener</p>', unsafe_allow_html=True)
+
+    # ── Mode selector ──────────────────────────────────────────────────────
+    scr_mode = st.radio(
+        "Source",
+        ["🌐 NSE Universe", "📂 Upload Watchlist"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    col_src, col_run = st.columns([3, 1])
+    scr_symbols: list = []
+    scr_source_label = ""
+
+    if scr_mode == "🌐 NSE Universe":
+        with col_src:
+            universe_name = st.selectbox(
+                "Universe",
+                ["Nifty 500", "Nifty 50"],
+                label_visibility="collapsed",
+            )
+        scr_source_label = universe_name
+    else:
+        with col_src:
+            wl_file = st.file_uploader(
+                "Upload watchlist (CSV / XLS / XLSX)",
+                type=["csv", "xls", "xlsx"],
+                label_visibility="collapsed",
+            )
+
+    # ── Filters ────────────────────────────────────────────────────────────
+    with st.expander("⚙️ Filters", expanded=True):
+        fc1, fc2, fc3 = st.columns(3)
+        tolerance = fc1.slider("SMA Tolerance (%)", 0.1, 5.0, 1.0, 0.1,
+                               help="Max % distance between SMA10 and SMA50")
+        bullish_only = fc2.checkbox("Bullish Only (SMA10 ≥ SMA50)", value=False)
+        sort_by = fc3.selectbox(
+            "Sort by",
+            ["Closest Match", "Highest RSI", "Lowest RSI", "Highest Price", "Lowest Price", "Alphabetical"],
+        )
+        fp1, fp2, fp3, fp4 = st.columns(4)
+        rsi_min = fp1.number_input("RSI Min", 0, 100, 0, step=1)
+        rsi_max = fp2.number_input("RSI Max", 0, 100, 100, step=1)
+        price_min = fp3.number_input("Min Price (₹)", 0, value=0, step=10)
+        price_max_raw = fp4.number_input("Max Price (₹)", 0, value=0, step=100,
+                                          help="0 = no limit")
+        price_max = float(price_max_raw) if price_max_raw > 0 else None
+
+    run_btn = col_run.button("▶ Run Screener", type="primary", use_container_width=True)
+
+    if run_btn:
+        # ── Resolve symbol list ────────────────────────────────────────────
+        if scr_mode == "🌐 NSE Universe":
+            with st.spinner(f"Loading {universe_name}…"):
+                scr_symbols = md.get_universe(universe_name)
+            scr_source_label = universe_name
+        else:
+            if "wl_file" not in dir() or wl_file is None:
+                st.warning("Upload a watchlist file first.")
+                st.stop()
+            syms, err = scr.parse_watchlist_upload(wl_file.read(), wl_file.name)
+            if err:
+                st.error(err)
+                st.stop()
+            scr_symbols = syms
+            scr_source_label = f"Uploaded ({len(syms)} symbols)"
+
+        if not scr_symbols:
+            st.warning("No symbols to screen.")
+        else:
+            # ── Fetch history ──────────────────────────────────────────────
+            suffix_map_scr = {t: ".NS" for t in scr_symbols}
+            tickers_tuple_scr = tuple(scr_symbols)
+            with st.spinner(f"Fetching 200-day history for {len(scr_symbols)} stocks…"):
+                closes_dict = md.fetch_screener_history(tickers_tuple_scr, suffix_map_scr, "200d")
+
+            # ── Compute metrics ────────────────────────────────────────────
+            with st.spinner("Computing indicators…"):
+                metrics_df, skipped = analytics.calculate_screening_metrics(closes_dict)
+
+            # ── Run engine ─────────────────────────────────────────────────
+            engine = scr.ScreeningEngine()
+            rule = scr.SMAProximityRule(tolerance_pct=tolerance, bullish_only=bullish_only)
+            results = engine.run(
+                metrics_df,
+                rules=[rule],
+                price_min=float(price_min),
+                price_max=price_max,
+                rsi_min=float(rsi_min),
+                rsi_max=float(rsi_max),
+            )
+
+            # ── Apply sort ─────────────────────────────────────────────────
+            sort_map = {
+                "Closest Match":  ("distance_pct", True),
+                "Highest RSI":    ("rsi", False),
+                "Lowest RSI":     ("rsi", True),
+                "Highest Price":  ("price", False),
+                "Lowest Price":   ("price", True),
+                "Alphabetical":   ("ticker", True),
+            }
+            scol, sasc = sort_map.get(sort_by, ("distance_pct", True))
+            if not results.empty:
+                results = results.sort_values(scol, ascending=sasc).reset_index(drop=True)
+
+            screened = len(closes_dict)
+            matched = len(results)
+            avg_rsi = round(results["rsi"].mean(), 1) if not results.empty else 0
+
+            # ── KPI cards ─────────────────────────────────────────────────
+            k1, k2, k3, k4, k5 = st.columns(5)
+            k1.metric("Universe", len(scr_symbols))
+            k2.metric("Screened", screened)
+            k3.metric("Matched", matched)
+            k4.metric("Skipped", len(skipped))
+            k5.metric("Avg RSI (matched)", avg_rsi if matched else "—")
+
+            if results.empty:
+                st.info(f"No stocks matched within {tolerance}% SMA tolerance. Try widening the filter.")
+            else:
+                # ── Results table ──────────────────────────────────────────
+                disp_df = results[["ticker", "price", "rsi", "sma10", "sma50", "distance_pct", "signal"]].copy()
+                disp_df.columns = ["Symbol", "Price (₹)", "RSI", "SMA10", "SMA50", "Diff %", "Signal"]
+                disp_df["Price (₹)"] = disp_df["Price (₹)"].apply(lambda v: fmt_inr(v))
+                disp_df["RSI"] = disp_df["RSI"].apply(lambda v: fmt_num(v, 1))
+                disp_df["SMA10"] = disp_df["SMA10"].apply(lambda v: fmt_num(v, 2))
+                disp_df["SMA50"] = disp_df["SMA50"].apply(lambda v: fmt_num(v, 2))
+                disp_df["Diff %"] = disp_df["Diff %"].apply(lambda v: f"{v:.2f}%")
+
+                SIGNAL_COLORS = {
+                    "Perfect Touch": GOLD,
+                    "Bullish Cross": GAIN,
+                    "Bullish Touch": "#5ba85f",
+                }
+
+                def _sig_color(val):
+                    c = SIGNAL_COLORS.get(val, MUTED)
+                    return f"color: {c}; font-weight: 600"
+
+                styled = disp_df.style.applymap(_sig_color, subset=["Signal"])
+                st.dataframe(styled, use_container_width=True, hide_index=True)
+
+                # ── Advanced metrics ───────────────────────────────────────
+                with st.expander("📐 Advanced Metrics"):
+                    adv = results[["ticker", "sma10_above", "wk52_high", "wk52_low", "price"]].copy()
+                    adv["Above SMA50"] = adv["sma10_above"].map({True: "✓ Yes", False: "✗ No"})
+                    adv["Dist 52W High"] = adv.apply(
+                        lambda r: f"{(r['price']/r['wk52_high']-1)*100:.1f}%" if r['wk52_high'] > 0 else "—", axis=1
+                    )
+                    adv["Dist 52W Low"] = adv.apply(
+                        lambda r: f"{(r['price']/r['wk52_low']-1)*100:.1f}%" if r['wk52_low'] > 0 else "—", axis=1
+                    )
+                    st.dataframe(
+                        adv[["ticker", "Above SMA50", "Dist 52W High", "Dist 52W Low"]].rename(columns={"ticker": "Symbol"}),
+                        use_container_width=True, hide_index=True
+                    )
+
+                # ── Export ─────────────────────────────────────────────────
+                export_df = results[["ticker", "price", "rsi", "sma10", "sma50", "distance_pct", "signal"]].copy()
+                export_df.columns = ["symbol", "price", "rsi", "sma10", "sma50", "distance_pct", "signal"]
+                ce1, ce2 = st.columns(2)
+                ce1.download_button(
+                    "⬇️ Export CSV",
+                    export_df.to_csv(index=False).encode(),
+                    file_name=f"screener_{pd.Timestamp.now():%Y%m%d_%H%M}.csv",
+                    mime="text/csv",
+                )
+                ce2.download_button(
+                    "⬇️ Export Excel",
+                    to_excel_bytes(export_df, {}),
+                    file_name=f"screener_{pd.Timestamp.now():%Y%m%d_%H%M}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+
+            # ── Skipped diagnostics ────────────────────────────────────────
+            if skipped:
+                with st.expander(f"⚠️ Skipped symbols ({len(skipped)})"):
+                    st.caption("Skipped due to insufficient price history (< 60 trading days):")
+                    st.write(", ".join(sorted(skipped)))
+
+    st.stop()
 
 if raw is None or raw.empty:
     render_landing("⚙️ Open <b>Upload / Data</b> in the sidebar and drop your broker file to begin.")
