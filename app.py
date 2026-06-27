@@ -557,7 +557,7 @@ if section == "🔎 Screener":
                     c = SIGNAL_COLORS.get(val, MUTED)
                     return f"color: {c}; font-weight: 600"
 
-                styled = disp_df.style.applymap(_sig_color, subset=["Signal"])
+                styled = disp_df.style.map(_sig_color, subset=["Signal"])
                 st.dataframe(styled, use_container_width=True, hide_index=True)
 
                 # ── Advanced metrics ───────────────────────────────────────
