@@ -11,6 +11,7 @@ four reader needs.
 
 - [Add a broker format](howto-add-a-broker.md) — support a new broker export.
 - [Deploy](howto-deploy.md) — the Streamlit app (Community Cloud) + the landing page (GitHub Pages).
+- [Setup (local dev)](howto-setup.md) — first-time install and run.
 - [Host / update the landing page](howto-host-landing-page.md) — edit, push, and the `APP_URL` wiring.
 
 ## Reference — information-oriented
@@ -28,5 +29,4 @@ four reader needs.
 
 ---
 
-See also the top-level [README](../README.md), [PRD](../PRD.md), [DESIGN](../DESIGN.md),
-[PRODUCT](../PRODUCT.md), [SETUP](../SETUP.md), and [DEPLOY](../DEPLOY.md).
+See also the top-level [README](../README.md), [product/](../product/), [design system](design-system.md), [setup](howto-setup.md).
