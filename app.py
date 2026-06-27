@@ -453,14 +453,14 @@ if section == "🔎 Screener":
         fc1, fc2, fc3 = st.columns(3)
         tolerance = fc1.slider("SMA Tolerance (%)", 0.1, 5.0, 1.0, 0.1,
                                help="Max % distance between SMA10 and SMA50")
-        bullish_only = fc2.checkbox("Bullish Only (SMA10 ≥ SMA50)", value=False)
+        bullish_only = fc2.checkbox("Bullish Only (SMA10 ≥ SMA50)", value=True)
         sort_by = fc3.selectbox(
             "Sort by",
             ["Closest Match", "Highest RSI", "Lowest RSI", "Highest Price", "Lowest Price", "Alphabetical"],
         )
         fp1, fp2, fp3, fp4 = st.columns(4)
-        rsi_min = fp1.number_input("RSI Min", 0, 100, 0, step=1)
-        rsi_max = fp2.number_input("RSI Max", 0, 100, 100, step=1)
+        rsi_min = fp1.number_input("RSI Min", 0, 100, 50, step=1)
+        rsi_max = fp2.number_input("RSI Max", 0, 100, 65, step=1)
         price_min = fp3.number_input("Min Price (₹)", 0, value=0, step=10)
         price_max_raw = fp4.number_input("Max Price (₹)", 0, value=0, step=100,
                                           help="0 = no limit")
@@ -501,7 +501,7 @@ if section == "🔎 Screener":
             # ── Run engine ─────────────────────────────────────────────────
             engine = scr.ScreeningEngine()
             rule = scr.SMAProximityRule(tolerance_pct=tolerance, bullish_only=bullish_only)
-            results = engine.run(
+            results, rejected_sma, rejected_rsi = engine.run(
                 metrics_df,
                 rules=[rule],
                 price_min=float(price_min),
@@ -528,12 +528,26 @@ if section == "🔎 Screener":
             avg_rsi = round(results["rsi"].mean(), 1) if not results.empty else 0
 
             # ── KPI cards ─────────────────────────────────────────────────
-            k1, k2, k3, k4, k5 = st.columns(5)
+            k1, k2, k3, k4, k5, k6, k7 = st.columns(7)
             k1.metric("Universe", len(scr_symbols))
             k2.metric("Screened", screened)
-            k3.metric("Matched", matched)
-            k4.metric("Skipped", len(skipped))
-            k5.metric("Avg RSI (matched)", avg_rsi if matched else "—")
+            k3.metric("Rejected (SMA)", rejected_sma)
+            k4.metric("Rejected (RSI)", rejected_rsi)
+            k5.metric("Matched", matched)
+            k6.metric("Skipped", len(skipped))
+            k7.metric("Avg RSI (matched)", avg_rsi if matched else "—")
+
+            filters_lines = [
+                f"✓ SMA10 within {tolerance}% of SMA50",
+                f"✓ RSI between {rsi_min} and {rsi_max}",
+            ]
+            if bullish_only:
+                filters_lines.append("✓ Bullish Only")
+            if price_min > 0:
+                filters_lines.append(f"✓ Price ≥ ₹{int(price_min):,}")
+            if price_max:
+                filters_lines.append(f"✓ Price ≤ ₹{int(price_max):,}")
+            st.info("**Active Filters** — " + " · ".join(filters_lines))
 
             if results.empty:
                 st.info(f"No stocks matched within {tolerance}% SMA tolerance. Try widening the filter.")

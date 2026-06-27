@@ -128,20 +128,20 @@ class TestScreeningEngine(unittest.TestCase):
     def test_price_filter(self):
         engine = scr.ScreeningEngine()
         rule = scr.SMAProximityRule(tolerance_pct=5.0)
-        result = engine.run(self._base_df(), [rule], price_min=100.0)
+        result, _, _ = engine.run(self._base_df(), [rule], price_min=100.0)
         self.assertTrue((result["price"] >= 100.0).all())
 
     def test_rsi_filter(self):
         engine = scr.ScreeningEngine()
         rule = scr.SMAProximityRule(tolerance_pct=5.0)
-        result = engine.run(self._base_df(), [rule], rsi_min=50.0, rsi_max=65.0)
-        self.assertTrue((result["rsi"] >= 50.0).all())
-        self.assertTrue((result["rsi"] <= 65.0).all())
+        result, _, _ = engine.run(self._base_df(), [rule], rsi_min=50.0, rsi_max=65.0)
+        self.assertTrue((result["rsi"] > 50.0).all())
+        self.assertTrue((result["rsi"] < 65.0).all())
 
     def test_sort_by_distance_asc(self):
         engine = scr.ScreeningEngine()
         rule = scr.SMAProximityRule(tolerance_pct=5.0)
-        result = engine.run(self._base_df(), [rule])
+        result, _, _ = engine.run(self._base_df(), [rule])
         dists = result["distance_pct"].tolist()
         self.assertEqual(dists, sorted(dists))
 
@@ -150,7 +150,7 @@ class TestScreeningEngine(unittest.TestCase):
         rule = scr.SMAProximityRule()
         empty = pd.DataFrame(columns=["ticker", "price", "sma10", "sma50", "rsi",
                                        "distance_pct", "sma10_above", "wk52_high", "wk52_low"])
-        result = engine.run(empty, [rule])
+        result, _, _ = engine.run(empty, [rule])
         self.assertTrue(result.empty)
 
 

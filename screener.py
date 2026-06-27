@@ -49,26 +49,30 @@ class ScreeningEngine:
         rules: list,
         price_min: float = 0,
         price_max: Optional[float] = None,
-        rsi_min: float = 0,
-        rsi_max: float = 100,
-    ) -> pd.DataFrame:
+        rsi_min: float = 50,
+        rsi_max: float = 65,
+    ) -> "tuple[pd.DataFrame, int, int]":
         if metrics_df.empty:
-            return metrics_df
+            return metrics_df, 0, 0
         df = metrics_df.copy()
         df = df[df["price"] >= price_min]
         if price_max:
             df = df[df["price"] <= price_max]
-        df = df[(df["rsi"] >= rsi_min) & (df["rsi"] <= rsi_max)]
+        after_price = len(df)
+        # primary: SMA rules
         for rule in rules:
-            mask = rule.apply(df)
-            df = df[mask]
+            df = df[rule.apply(df)]
+        rejected_sma = after_price - len(df)
+        # secondary: RSI
+        before_rsi = len(df)
+        df = df[(df["rsi"] > rsi_min) & (df["rsi"] < rsi_max)]
+        rejected_rsi = before_rsi - len(df)
+        df = df.copy()
         if not df.empty and rules:
-            df = df.copy()
             df["signal"] = df.apply(rules[0].classify, axis=1)
         else:
-            df = df.copy()
             df["signal"] = ""
-        return df.sort_values("distance_pct").reset_index(drop=True)
+        return df.sort_values("distance_pct").reset_index(drop=True), rejected_sma, rejected_rsi
 
 
 def parse_watchlist_upload(file_bytes: bytes, filename: str) -> "tuple[list[str], str]":
@@ -113,12 +117,12 @@ def _demo():
         "distance_pct": [0.05, 0.5, 2.0, 0.8],
         "sma10_above": [True, False, True, False],
     })
-    out = ScreeningEngine().run(df, [SMAProximityRule(tolerance_pct=1.0)], rsi_max=70)
+    out, _, _ = ScreeningEngine().run(df, [SMAProximityRule(tolerance_pct=1.0)], rsi_max=70)
     assert list(out["distance_pct"]) == [0.05, 0.8], out["distance_pct"].tolist()
     assert out.iloc[0]["signal"] == "Perfect Touch", out.iloc[0]["signal"]
     assert out.iloc[1]["signal"] == "Bullish Touch", out.iloc[1]["signal"]
 
-    bull = ScreeningEngine().run(df, [SMAProximityRule(tolerance_pct=1.0, bullish_only=True)], rsi_max=70)
+    bull, _, _ = ScreeningEngine().run(df, [SMAProximityRule(tolerance_pct=1.0, bullish_only=True)], rsi_max=70)
     assert list(bull["distance_pct"]) == [0.05], bull["distance_pct"].tolist()
 
     syms, err = parse_watchlist_upload(b"symbol\nRELIANCE\ntcs.ns\nRELIANCE\n", "wl.csv")
