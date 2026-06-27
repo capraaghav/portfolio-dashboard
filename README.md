@@ -2,15 +2,15 @@
 
 **See everything you own — across every broker — in one honest view.**
 
-A private, local-only dashboard for Indian stock investors. Drop in your broker
-export (Zerodha, Groww, Upstox, Angel One, HDFC, IIFL, or any CSV/Excel/PDF) and
-instantly get a consolidated picture of your holdings with live NSE/BSE prices,
-plus technical, fundamental, tax, risk, dividend, and analyst analysis — and a
-built-in stock screener to find new opportunities.
+A web dashboard for Indian stock investors. Open it in your browser, drop in your
+broker export (Zerodha, Groww, Upstox, Angel One, HDFC, IIFL, or any
+CSV/Excel/PDF), and instantly get a consolidated picture of your holdings with
+live NSE/BSE prices, plus technical, fundamental, tax, risk, dividend, and
+analyst analysis — and a built-in stock screener to find new opportunities.
 
-> 🔒 **Your data never leaves your machine.** The only outbound calls are to
-> Yahoo Finance for prices and fundamentals. Your holdings, quantities, and costs
-> are never uploaded, logged, or shared with anyone.
+> 🔒 **Your data stays private to your session.** The app only contacts Yahoo
+> Finance for public prices and fundamentals. Your holdings, quantities, and
+> costs are never shared with anyone.
 
 ---
 
@@ -18,14 +18,14 @@ built-in stock screener to find new opportunities.
 
 - [Who this is for](#who-this-is-for)
 - [What problem it solves](#what-problem-it-solves)
-- [Quick start (5 minutes)](#quick-start-5-minutes)
+- [Getting started](#getting-started)
 - [How to get your broker file](#how-to-get-your-broker-file)
 - [The dashboard, tab by tab](#the-dashboard-tab-by-tab)
 - [Supported brokers & file types](#supported-brokers--file-types)
 - [Sidebar toggles — speed vs depth](#sidebar-toggles--speed-vs-depth)
 - [Frequently asked questions](#frequently-asked-questions)
 - [Troubleshooting](#troubleshooting)
-- [Privacy & where your data lives](#privacy--where-your-data-lives)
+- [Privacy](#privacy)
 - [Limitations & honest caveats](#limitations--honest-caveats)
 - [Full documentation](#full-documentation)
 
@@ -38,11 +38,11 @@ built-in stock screener to find new opportunities.
 - Anyone tired of broker dashboards that hide P&L, scatter accounts, or can't
   tell you your **tax liability**, **portfolio risk**, or **whether you're
   beating the index**.
-- Investors who care about **privacy** — this runs entirely on your own
-  computer. Nothing is uploaded.
+- Investors who care about **privacy** — your holdings stay private to your
+  session and are never shared.
 
-No coding knowledge needed to use it. If you can install one program and drag a
-file, you're set.
+No coding knowledge needed. If you can open a web page and drag a file, you're
+set.
 
 ---
 
@@ -61,37 +61,18 @@ truth. This app:
 4. **Finds new ideas** with a screener that scans the Nifty 500 (or your own
    watchlist) for stocks matching a momentum strategy.
 
-All free, all local.
+All free.
 
 ---
 
-## Quick start (5 minutes)
+## Getting started
 
-You need **Python 3** installed (`python3 --version` to check — Macs usually
-have it; Windows users grab it from [python.org](https://www.python.org/downloads/)).
+1. **Open the app** in your browser.
+2. **Drag your broker export file** (CSV / Excel / PDF) into the sidebar.
+3. See your full portfolio in seconds.
 
-```bash
-# 1. Install dependencies (first time only)
-pip3 install -r requirements.txt
-
-# 2. Run the app
-streamlit run app.py
-```
-
-Your browser opens automatically at **<http://localhost:8501>**.
-
-If your terminal says `streamlit: command not found`, it installed to a folder
-not on your PATH. Use the full path printed during install, for example:
-
-```bash
-~/Library/Python/3.9/bin/streamlit run app.py
-```
-
-**Windows / Mac shortcut:** double-click `scripts/run.command` (Mac) or
-`scripts/run.bat` (Windows) instead of typing commands.
-
-Once it's open, **drag your broker export file into the sidebar** — and you'll
-see your portfolio in seconds.
+That's it — no install, no account, no API key. To track multiple accounts, drop
+in more than one file and they're merged automatically.
 
 ---
 
@@ -129,7 +110,7 @@ overlapping stocks are merged automatically.
 | **⚠️ Risk** | How exposed you really are: largest position, top-5 weight, effective number of holdings (HHI), portfolio beta, sector concentration, and plain-English warnings. |
 | **💰 Dividends** | Trailing-twelve-month dividend income per stock, your overall portfolio yield, and an income chart. |
 | **🔍 Stock Detail** | Deep-dive on any one stock: 1-year candlestick with SMAs and **your average-cost line**, a 52-week-range gauge, fundamentals, analyst consensus, dividend history, and recent news. |
-| **👁️ Watchlist** | Track stocks you *don't* own yet — live price, day change, analyst target. Saved locally between sessions. |
+| **👁️ Watchlist** | Track stocks you *don't* own yet — live price, day change, analyst target. Saved between sessions. |
 | **⚖️ Rebalance** | Set target weights for your holdings and see the drift, plus the exact ₹ amount to buy or sell to hit them. (Suggestions only — it never places orders.) |
 
 ---
@@ -189,13 +170,12 @@ Yes — entirely. No subscription, no API key, no account. Prices come from Yaho
 Finance's free endpoints.
 
 **Do I need to know how to code?**
-No. You run two commands once (or double-click the launcher), then it's all
-point-and-click in your browser.
+No. Open the page, drag your file, and it's all point-and-click in your browser.
 
 **Is my portfolio data sent anywhere?**
-No. It stays on your computer in a local `./data/` folder. The app only contacts
-Yahoo Finance, and only to ask for *public* prices and fundamentals of the
-tickers you hold — never your quantities or costs.
+Your holdings stay private to your session. The app only contacts Yahoo Finance,
+and only to ask for *public* prices and fundamentals of the tickers you hold —
+never your quantities or costs.
 
 **Can I track multiple brokers / family accounts?**
 Yes. Upload one file per account. Overlapping stocks merge into a single row with
@@ -209,35 +189,23 @@ fill it in.
 **Does it place trades or move money?**
 Never. It's read-only. Rebalancing only *suggests* what to buy/sell.
 
-**Can I host it online so others can use it?**
-Yes — see [`docs/howto-deploy.md`](docs/howto-deploy.md). It supports a
-multi-user hosted mode (each visitor's data stays private to their session) and
-an optional Supabase cloud backend with login.
-
 ---
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| `streamlit: command not found` | It installed off your PATH. Run with the full path, e.g. `~/Library/Python/3.9/bin/streamlit run app.py`. |
-| `pip3: command not found` | Python isn't installed or not on PATH. Install Python 3 from [python.org](https://www.python.org/downloads/). |
 | Prices show "—" for some stocks | Yahoo has no data for that ticker. Use **manual price override** in Holdings. |
 | My broker file isn't recognised | As long as it has Symbol/ISIN + Quantity + Price columns it should parse. See [`docs/howto-add-a-broker.md`](docs/howto-add-a-broker.md). |
-| Want to start fresh | Delete the `./data/` folder — that clears snapshots, last session, watchlist, and overrides. |
-| App is slow on first load | Turn off **Technical** and **Dividend** toggles; they download per-stock history. Subsequent loads are cached. |
+| App is slow on first load | Turn off **Technical** and **Dividend** toggles; they fetch per-stock history. Subsequent loads are cached. |
 
 ---
 
-## Privacy & where your data lives
+## Privacy
 
-Everything is stored locally under `./data/`:
-- `snapshots.json` — your daily portfolio-value history (powers Performance)
-- last-session parquet — so your portfolio reloads instantly
-- watchlist + manual price overrides
-
-This folder is **git-ignored** — it never goes into the repository. Delete it any
-time to reset the app to a clean state.
+Your holdings stay private to your session — they're never shared with anyone.
+The only outbound calls are to Yahoo Finance, and only for *public* prices and
+fundamentals of the tickers you hold, never your quantities or costs.
 
 ---
 
@@ -268,7 +236,7 @@ In-depth docs live in [`docs/`](docs/README.md), organised by the
 
 - **Tutorial** — [Getting started](docs/tutorial-getting-started.md)
 - **How-to** — [add a broker](docs/howto-add-a-broker.md),
-  [deploy](docs/howto-deploy.md), [set up locally](docs/howto-setup.md),
+  [deploy](docs/howto-deploy.md),
   [host the landing page](docs/howto-host-landing-page.md)
 - **Reference** — [modules](docs/reference-modules.md),
   [broker formats](docs/reference-broker-formats.md),
