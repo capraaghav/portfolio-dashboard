@@ -423,10 +423,15 @@ if section == "🔎 Screener":
     # ── Mode selector ──────────────────────────────────────────────────────
     scr_mode = st.radio(
         "Source",
-        ["🌐 NSE Universe", "📂 Upload Watchlist"],
+        ["🌐 NSE Universe", "📂 Upload Watchlist", "💼 My Accounts"],
         horizontal=True,
         label_visibility="collapsed",
     )
+
+    # Holdings from a previously uploaded/saved portfolio, for the "My Accounts" mode.
+    scr_raw = store.load_session()
+    scr_accts = sorted(scr_raw["account"].dropna().unique()) if (
+        scr_raw is not None and not scr_raw.empty and "account" in scr_raw.columns) else []
 
     col_src, col_run = st.columns([3, 1])
     scr_symbols: list = []
@@ -440,13 +445,23 @@ if section == "🔎 Screener":
                 label_visibility="collapsed",
             )
         scr_source_label = universe_name
-    else:
+    elif scr_mode == "📂 Upload Watchlist":
         with col_src:
             wl_file = st.file_uploader(
                 "Upload watchlist (CSV / XLS / XLSX)",
                 type=["csv", "xls", "xlsx"],
                 label_visibility="collapsed",
             )
+    else:  # 💼 My Accounts
+        with col_src:
+            if not scr_accts:
+                st.info("No uploaded portfolio found. Add files in **⚙️ Upload / Data** first.")
+                scr_sel_accts = []
+            else:
+                scr_sel_accts = st.multiselect(
+                    "Accounts", scr_accts, default=scr_accts,
+                    label_visibility="collapsed",
+                    help="Screen the stocks you hold in the chosen accounts.")
 
     # ── Filters ────────────────────────────────────────────────────────────
     with st.expander("⚙️ Filters", expanded=True):
@@ -474,7 +489,7 @@ if section == "🔎 Screener":
             with st.spinner(f"Loading {universe_name}…"):
                 scr_symbols = md.get_universe(universe_name)
             scr_source_label = universe_name
-        else:
+        elif scr_mode == "📂 Upload Watchlist":
             if "wl_file" not in dir() or wl_file is None:
                 st.warning("Upload a watchlist file first.")
                 st.stop()
@@ -484,6 +499,14 @@ if section == "🔎 Screener":
                 st.stop()
             scr_symbols = syms
             scr_source_label = f"Uploaded ({len(syms)} symbols)"
+        else:  # 💼 My Accounts
+            if not scr_sel_accts:
+                st.warning("Pick at least one account to screen.")
+                st.stop()
+            held = scr_raw[scr_raw["account"].isin(scr_sel_accts)]
+            scr_symbols = sorted(t for t in held["ticker"].dropna().unique()
+                                 if parsers.looks_like_symbol(str(t)) and not parsers.is_isin(str(t)))
+            scr_source_label = f"My Accounts ({len(scr_symbols)} stocks)"
 
         if not scr_symbols:
             st.warning("No symbols to screen.")
