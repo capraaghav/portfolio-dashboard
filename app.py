@@ -618,6 +618,25 @@ if raw is None or raw.empty:
     render_landing("⚙️ Open <b>Upload / Data</b> in the sidebar and drop your broker file to begin.")
     st.stop()
 
+# ─── Global account selector — scope the whole dashboard to chosen accounts ───
+# Lives in the sidebar (a second `with st.sidebar` block, rendered after raw is
+# known). Filters `raw` before holdings/totals/sections so every tab reflects the
+# selection. Only shown when more than one account was uploaded.
+if "account" in raw.columns:
+    _all_accts = sorted(raw["account"].dropna().unique())
+    if len(_all_accts) > 1:
+        with st.sidebar:
+            with st.expander("🗂️  Accounts", expanded=True):
+                st.caption("Choose which uploaded accounts feed the dashboard.")
+                _sel_accts = st.multiselect(
+                    "Include accounts", _all_accts, default=_all_accts,
+                    key="global_accounts", label_visibility="collapsed")
+        if not _sel_accts:
+            st.warning("No accounts selected — pick at least one in the sidebar **🗂️ Accounts**.")
+            st.stop()
+        if set(_sel_accts) != set(_all_accts):
+            raw = raw[raw["account"].isin(_sel_accts)].copy()
+
 # ─── Resolve symbols (some brokers store the full company name or only an ISIN) ─
 
 # Show a dashboard-shaped skeleton while the first (cold) load runs; cleared once
