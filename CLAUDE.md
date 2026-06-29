@@ -23,6 +23,7 @@ Clear caches (prices, metadata, TA) via in-app **🔄 Refresh data** button, or 
 | `app.py` | Streamlit entrypoint. All UI sections, sidebar, CSS, data-flow orchestration. Single long file — each tab/section is a top-level `if section == "…":` block. |
 | `market_data.py` | All Yahoo Finance I/O (`yfinance`). `@st.cache_data`-decorated functions for quotes, metadata, TA signals, dividends, history. Symbol resolution (company name / ISIN → NSE/BSE ticker). |
 | `analytics.py` | Pure computation: holdings consolidation, RSI/SMA signals, tax (LTCG/STCG), XIRR, risk metrics, rebalance drift. No I/O, no Streamlit. |
+| `intelligence.py` | AI Portfolio Intelligence Engine — pure detection over `analytics` output. Evidence/`Insight`/`HealthScore` models, detector registry, priority ranking, explainable health score. `analyze()` is the entry. No I/O, no Streamlit. Detectors never invent — they return `[]` on missing data. See `product/EDS-ai-portfolio-intelligence.md`. |
 | `charts.py` | Plotly figure builders, one function per chart. Returns `go.Figure` or `None`. |
 | `parsers.py` | Broker CSV/Excel/PDF parsing. Auto-detects Zerodha, Groww, Upstox, Angel One, HDFC, Reliance, IndusInd, IIFL. Normalises to canonical DataFrame with columns `ticker, qty, avg_cost, ltp, account`. |
 | `formatting.py` | Theme tokens (`GOLD`, `GAIN`, `LOSS`, `BG`, etc.) and `fmt_inr`, `fmt_pct`, `fmt_num`, `fmt_mcap` helpers. Single source of truth — `app.py` imports palette directly into its CSS `:root {}` block. |

@@ -55,9 +55,13 @@ rerun, and each stage only depends on the stage above it.
   analytics.portfolio_totals(holdings)   +   store.auto_snapshot_if_new(...)
         │   portfolio value / cost / P&L  ·  one silent daily snapshot
         ▼
-  render ONE of 11 sidebar sections
-        Overview · Holdings · Performance · Technical · Analysts ·
-        Tax · Risk · Dividends · Stock Detail · Watchlist · Rebalance
+  intelligence.analyze(holdings, raw, prices, meta, totals, ta_signals, quotes)
+        │   pure detection → ranked, evidence-backed insights + health score
+        │   (deterministic; detectors return [] on missing data, never invent)
+        ▼
+  render ONE of 13 sidebar sections
+        Intelligence · Overview · Holdings · Performance · Technical · Screener ·
+        Analysts · Tax · Risk · Dividends · Stock Detail · Watchlist · Rebalance
 ```
 
 ## Why it is shaped this way
