@@ -205,6 +205,31 @@ def render_landing(subline: str) -> None:
 """, unsafe_allow_html=True)
 
 
+# Bundled onboarding sample — two demo accounts fed through the real parser so a
+# new visitor sees a populated, insight-rich dashboard without owning a broker file.
+_DEMO_FILES = [("demo_long_term.csv", "Demo — Long Term"),
+               ("demo_trading.csv", "Demo — Trading")]
+
+
+@st.cache_data(show_spinner=False)
+def load_demo() -> "pd.DataFrame | None":
+    """Parse the bundled sample CSVs into the canonical raw schema (no I/O on disk
+    beyond reading the shipped files; routed through parsers.parse_all like a real
+    upload). Cached — the files never change."""
+    sample_dir = Path(__file__).parent / "data" / "sample"
+    uploads, names = [], {}
+    for fname, label in _DEMO_FILES:
+        path = sample_dir / fname
+        if not path.exists():
+            return None
+        buf = io.BytesIO(path.read_bytes())
+        buf.name = fname
+        uploads.append(buf)
+        names[fname] = label
+    raw_df, _ = parse_all(uploads, names)
+    return raw_df
+
+
 # Auth gate. Logged-out visitors get a compact hero + the login form. The full
 # marketing page lives separately at index.html (its CTA opens this app).
 if USE_DB:
@@ -333,6 +358,19 @@ with st.sidebar:
                     st.error(err)
     # A click-through from another tab (e.g. Technical) parks the target section
     # here; apply it before the radio instantiates so it lands selected.
+    # Initialise the data-toggle defaults once (so the toggles can be widget-keyed
+    # and still programmatically set — e.g. by the sample-data demo — without the
+    # value=/key= conflict).
+    for _k, _d in (("load_meta", True), ("load_ta", False), ("load_div", False)):
+        st.session_state.setdefault(_k, _d)
+    # Freshly-loaded sample demo: turn on depth toggles and land on Intelligence,
+    # all BEFORE the toggle/radio widgets instantiate (same pre-widget pattern).
+    if st.session_state.get("_demo") and not st.session_state.get("_demo_seeded"):
+        st.session_state["load_meta"] = True
+        st.session_state["load_ta"] = True
+        st.session_state["load_div"] = True
+        st.session_state["_goto_section"] = "🧠 Intelligence"
+        st.session_state["_demo_seeded"] = True
     if "_goto_section" in st.session_state:
         st.session_state["nav"] = st.session_state.pop("_goto_section")
     section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
@@ -359,15 +397,21 @@ with st.sidebar:
                 st.info(f"Last session: **{meta_info.get('rows', '?')} rows** "
                         f"saved {meta_info.get('saved_at', '')[:16].replace('T', ' ')}")
                 use_saved = st.button("↩️ Load last session", width='stretch')
+            if st.button("✨ Load sample portfolio", width='stretch',
+                         help="Explore the dashboard with a demo portfolio — no file needed."):
+                st.session_state["_demo"] = True
+                st.session_state["_demo_seeded"] = False
+                st.session_state["_use_saved"] = False
+                st.rerun()
 
         st.divider()
         exclude_nonequity = st.toggle("Equity only (remove funds & bonds)", value=False,
                                       help="Drops mutual funds and bonds/NCDs from the entire dashboard.")
-        load_meta = st.toggle("Sectors, targets & fundamentals", value=True,
+        load_meta = st.toggle("Sectors, targets & fundamentals", key="load_meta",
                               help="One Yahoo Finance .info call per stock. Slower on first load, cached 1 hour.")
-        load_ta = st.toggle("Technical analysis (SMA / RSI)", value=False,
+        load_ta = st.toggle("Technical analysis (SMA / RSI)", key="load_ta",
                             help="Bulk-downloads price history. ~10s first load, cached 1 hour.")
-        load_div = st.toggle("Dividend data", value=False,
+        load_div = st.toggle("Dividend data", key="load_div",
                              help="Fetches dividend history per stock for the Dividends section.")
 
         if st.button("🔄 Refresh data (clear cache)", width='stretch'):
@@ -406,11 +450,17 @@ unknown names fall back to the NSE official list, then a web search).
 
 raw: pd.DataFrame | None = None
 if uploaded:
+    st.session_state["_demo"] = False     # a real upload always wins over the demo
     raw, parse_errors = parse_all(uploaded, account_names)
     for fname, err in parse_errors:
         st.error(f"**`{fname}`** — {err}")
     if raw is not None:
         store.save_session(raw)
+    st.session_state["_use_saved"] = False
+elif st.session_state.get("_demo"):
+    # Sample portfolio — parsed from the bundled CSVs; never persisted, so it can't
+    # overwrite a real saved session.
+    raw = load_demo()
     st.session_state["_use_saved"] = False
 elif use_saved or st.session_state.get("_use_saved"):
     # Keep the loaded session across reruns (the button is one-shot) so filters/
@@ -640,7 +690,26 @@ if section == "🔎 Screener":
 
 if raw is None or raw.empty:
     render_landing("⚙️ Open <b>Upload / Data</b> in the sidebar and drop your broker file to begin.")
+    _, cmid, _ = st.columns([1, 1.4, 1])
+    with cmid:
+        st.write("")
+        if st.button("✨ Try it with sample data →", width='stretch', type="primary"):
+            st.session_state["_demo"] = True
+            st.session_state["_demo_seeded"] = False
+            st.session_state["_use_saved"] = False
+            st.rerun()
+        st.caption("Loads a demo portfolio so you can explore everything — "
+                   "no file, nothing saved. Your own upload replaces it anytime.")
     st.stop()
+
+if st.session_state.get("_demo"):
+    _bnl, _bnr = st.columns([6, 1])
+    _bnl.info("✨ You're viewing **sample data** — explore freely. "
+              "Upload your own broker file in the sidebar to replace it.")
+    if _bnr.button("Clear", help="Exit the sample portfolio", width='stretch'):
+        st.session_state["_demo"] = False
+        st.session_state["_demo_seeded"] = False
+        st.rerun()
 
 # ─── Global account selector — scope the whole dashboard to chosen accounts ───
 # Lives in the sidebar (a second `with st.sidebar` block, rendered after raw is

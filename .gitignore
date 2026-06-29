@@ -1,5 +1,8 @@
 # Personal data — never share or commit (holdings, snapshots, watchlist, prices)
-data/
+# Ignore data/ contents (not the dir itself) so the bundled sample can be re-included.
+data/*
+# …except the bundled onboarding sample portfolio (no real user data)
+!data/sample/
 
 # Python
 __pycache__/
