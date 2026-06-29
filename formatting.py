@@ -58,6 +58,16 @@ REC_COLOR = {
     "—":            "#555555",
 }
 
+# Intelligence-engine severity tokens. Severity is glyph + word + tint, never
+# tint alone (P&L-Is-Not-Just-Colour Rule generalised). Tint marks the glyph/word
+# only, never the card background — gold stays within the One-Lamp Rule.
+SEVERITY_ORDER = ["high", "medium", "low"]
+SEVERITY = {
+    "high":   {"glyph": "▲", "word": "high",   "tint": LOSS},   # coral
+    "medium": {"glyph": "◆", "word": "medium", "tint": GOLD},   # gold
+    "low":    {"glyph": "•", "word": "info",   "tint": MUTED},  # muted
+}
+
 # ─── Number formatting (Indian lakh/crore conventions) ───────────────────────
 
 def _num(val):

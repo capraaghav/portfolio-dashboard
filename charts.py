@@ -275,6 +275,26 @@ def wk52_gauge(price: float, low: float, high: float) -> go.Figure | None:
     return fig
 
 
+def health_gauge(score: int, band: str = "") -> go.Figure | None:
+    """0–100 Portfolio Health gauge (gold bar, near-black track)."""
+    if score is None:
+        return None
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number", value=score,
+        number={"font": {"color": GOLD, "size": 40}, "suffix": ""},
+        title={"text": band, "font": {"color": MUTED, "size": 14}},
+        gauge={"axis": {"range": [0, 100], "tickcolor": MUTED, "tickfont": {"color": MUTED}},
+               "bar": {"color": GOLD},
+               "bgcolor": "rgba(0,0,0,0)",
+               "borderwidth": 0,
+               "steps": [{"range": [0, 30], "color": "rgba(240,86,74,0.18)"},
+                         {"range": [30, 50], "color": "rgba(149,165,166,0.15)"},
+                         {"range": [50, 75], "color": "rgba(201,168,122,0.15)"},
+                         {"range": [75, 100], "color": "rgba(61,220,151,0.18)"}]}))
+    fig.update_layout(height=220, margin=dict(t=40, b=10, l=30, r=30))
+    return fig
+
+
 def dividend_history(divs: pd.Series) -> go.Figure | None:
     if divs is None or divs.empty:
         return None
