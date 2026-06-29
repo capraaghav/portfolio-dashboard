@@ -19,6 +19,7 @@ import streamlit as st
 import analytics
 import charts
 import db
+import intelligence
 import market_data as md
 import parsers
 import screener as scr
@@ -30,7 +31,7 @@ from formatting import (
     GOLD, BG, SURFACE, BORDER, TEXT, MUTED, GRID,
     SIDEBAR, PANEL, HOVER, SELECTED, SHIMMER,
     BORDER_HAIRLINE, BORDER_PANEL, BORDER_CONTROL,
-    INK_SOFT, MUTED_DEEP, DISABLED,
+    INK_SOFT, MUTED_DEEP, DISABLED, SEVERITY,
 )
 from parsers import parse_all
 
@@ -301,7 +302,7 @@ def _plotly_clicked_ticker(ev) -> str | None:
 
 # ─── Sidebar: brand + navigation + upload/data ───────────────────────────────
 
-SECTIONS = ["📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical", "🔎 Screener",
+SECTIONS = ["🧠 Intelligence", "📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical", "🔎 Screener",
             "🎯 Analysts", "🧮 Tax", "⚠️ Risk", "💰 Dividends", "🔍 Stock Detail", "👁️ Watchlist", "⚖️ Rebalance"]
 
 with st.sidebar:
@@ -798,6 +799,13 @@ try:
 except Exception:
     pass
 
+# AI Portfolio Intelligence — deterministic detection over the data above.
+# Pure call; never crashes the dashboard if a detector misbehaves.
+try:
+    intel = intelligence.analyze(holdings, raw, prices, meta, totals, ta_signals, quotes)
+except Exception:
+    intel = {"insights": [], "health": None, "move": {}, "empty": True}
+
 # Genuine failures = Yahoo-eligible equities we still couldn't price (not MF/NCD/unresolved)
 failed_tickers = [t for t in yahoo_tickers if prices.get(t) is None]
 non_yahoo = [t for t in tickers_tuple if t not in yahoo_eligible]
@@ -838,6 +846,95 @@ chart_data = holdings.dropna(subset=["Current Value (₹)"])
 chart_data = chart_data[chart_data["Current Value (₹)"] > 0]
 
 
+# ─── Intelligence rendering helpers (shared by the brief + the section) ───────
+
+def render_insight_card(ins, key_prefix=""):
+    """One insight as a bordered card: severity chip + title + body + evidence + link."""
+    sev = SEVERITY.get(ins.severity, SEVERITY["low"])
+    cat = ins.category.replace("_", " ").title()
+    with st.container(border=True):
+        st.markdown(
+            f'<span style="color:{sev["tint"]};font-weight:700">{sev["glyph"]} {cat}</span>'
+            f'<span style="color:{MUTED};font-size:0.72rem;letter-spacing:0.06em">'
+            f' · {sev["word"].upper()}</span>',
+            unsafe_allow_html=True)
+        st.markdown(f'**{ins.title}**')
+        st.markdown(f'<span style="color:{INK_SOFT}">{ins.body}</span>', unsafe_allow_html=True)
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            with st.expander("Evidence"):
+                st.json(ins.evidence)
+        with c2:
+            if st.button(f"View in {ins.section.split(' ', 1)[-1]} →",
+                         key=f"goto_{key_prefix}_{ins.id}", use_container_width=True):
+                st.session_state["nav"] = ins.section
+                st.rerun()
+
+
+def render_brief(insights, limit=3):
+    """Condensed top-N brief (used on Overview)."""
+    for ins in insights[:limit]:
+        render_insight_card(ins, key_prefix="brief")
+
+
+# ═══ INTELLIGENCE ═════════════════════════════════════════════════════════════
+if section == "🧠 Intelligence":
+    st.markdown('<div class="hero-label">INTELLIGENCE</div>', unsafe_allow_html=True)
+    cse, cre = st.columns([4, 1])
+    cse.subheader("What matters about your portfolio today")
+    if cre.button("↻ Re-analyse", use_container_width=True):
+        st.rerun()
+
+    health = intel.get("health")
+    move = intel.get("move") or {}
+    hc, mc = st.columns(2)
+    with hc:
+        with st.container(border=True):
+            st.markdown('<div class="hero-label">PORTFOLIO HEALTH</div>', unsafe_allow_html=True)
+            if health:
+                fig = charts.health_gauge(health.score, health.band)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+                with st.expander("Breakdown"):
+                    for comp in health.components:
+                        st.markdown(
+                            f"**{comp.name}** · {comp.subscore:.0f}/100 "
+                            f"<span style='color:{MUTED}'>(weight {comp.weight:.0%}) — "
+                            f"{comp.reason}</span>", unsafe_allow_html=True)
+            else:
+                st.caption("Not enough priced data for a health score.")
+    with mc:
+        with st.container(border=True):
+            st.markdown('<div class="hero-label">TODAY\'S MOVE</div>', unsafe_allow_html=True)
+            pct = move.get("pct")
+            if pct is not None:
+                col = GAIN if (move.get("abs") or 0) >= 0 else LOSS
+                st.markdown(
+                    f'<div style="font-size:1.65rem;font-weight:700;color:{col}">'
+                    f'{fmt_inr(move["abs"])}</div>'
+                    f'<div style="color:{col}">{fmt_pct(pct)} today</div>',
+                    unsafe_allow_html=True)
+                g = move.get("top_gainer")
+                if g:
+                    st.caption(f"Top mover: {g[0]} ({g[1]:+.1f}%)")
+            else:
+                st.caption("Day change unavailable.")
+
+    st.divider()
+    st.markdown('<div class="hero-label">INSIGHTS</div>', unsafe_allow_html=True)
+    insights = intel.get("insights") or []
+    if intel.get("empty"):
+        st.info("Upload a portfolio to get your intelligence brief.")
+    elif not insights:
+        st.success("Nothing demands attention today. No concentration, valuation, or "
+                   "technical flags — your book looks balanced.")
+    else:
+        for ins in insights:
+            render_insight_card(ins, key_prefix="full")
+        st.caption("Insights are generated from your own analytics — every claim links to the "
+                   "section that proves it. Information, not financial advice.")
+
+
 # ═══ OVERVIEW ═════════════════════════════════════════════════════════════════
 if section == "📊 Overview":
     # Hero — centred portfolio value
@@ -863,6 +960,19 @@ if section == "📊 Overview":
     k3.metric("Accounts", n_accounts)
     k4.metric("Live prices", f"{len(yahoo_eligible) - len(failed_tickers)}/{len(tickers_tuple)}")
     st.divider()
+
+    # Intelligence brief — the top few things that matter, surfaced first.
+    _brief = intel.get("insights") or []
+    if _brief:
+        bh1, bh2 = st.columns([4, 1])
+        bh1.subheader("🧠 What matters today")
+        if intel.get("health"):
+            bh2.metric("Health", f"{intel['health'].score}", help=intel["health"].band)
+        render_brief(_brief, limit=3)
+        if st.button("See full intelligence brief →", key="overview_to_intel"):
+            st.session_state["nav"] = "🧠 Intelligence"
+            st.rerun()
+        st.divider()
 
     st.subheader("Portfolio Heatmap")
     st.caption("Box size = position value · colour = gain/loss %. Grouped by sector.")
