@@ -848,6 +848,73 @@ chart_data = chart_data[chart_data["Current Value (₹)"] > 0]
 
 # ─── Intelligence rendering helpers (shared by the brief + the section) ───────
 
+# Friendly labels + value formatting for the per-insight evidence, so a
+# non-technical user reads "Largest holding: TITAN" not a raw JSON dump.
+_EV_LABEL = {
+    "top1_ticker": "Largest holding", "top1_pct": "Its weight",
+    "top5_pct": "Top-5 weight", "top_sector": "Largest sector",
+    "top_sector_pct": "Sector weight", "effective_n": "Effective holdings",
+    "n_positions": "Positions", "portfolio_beta": "Portfolio beta",
+    "threshold": "Flagged above", "harvestable_loss": "Harvestable loss",
+    "n": "Positions at a loss", "has_gains": "Gains to offset?",
+    "n_unpriced": "Unpriced holdings", "n_total": "Total holdings",
+    "coverage": "Live-price coverage", "rsi_threshold": "Overbought above",
+    "abs": "Value change", "pct": "% change", "top_gainer": "Top gainer",
+    "top_loser": "Top loser", "ticker": "Stock", "weight_pct": "Weight",
+    "price": "Price", "target_mean": "Analyst target", "upside_pct": "Upside to target",
+    "pe": "P/E", "sector_pe": "Sector P/E", "rsi": "RSI",
+    "near_52w_high": "At 52-wk high", "above_target": "Above target", "rich_pe": "Rich P/E",
+    "flagged": "Flagged holdings", "overbought": "Overbought holdings",
+}
+_EV_MONEY = {"harvestable_loss", "abs", "price", "target_mean"}
+_EV_PCT = {"top1_pct", "top5_pct", "top_sector_pct", "weight_pct", "upside_pct", "pct", "threshold"}
+_EV_BOOL = {"has_gains", "near_52w_high", "above_target", "rich_pe"}
+_EV_LIST = {"flagged", "overbought"}
+
+
+def _ev_label(k):
+    return _EV_LABEL.get(k, k.replace("_", " ").capitalize())
+
+
+def _ev_val(k, v):
+    """Format one evidence value for humans."""
+    if v is None:
+        return "—"
+    if isinstance(v, np.generic):       # unwrap numpy scalars (np.False_, np.float64…)
+        v = v.item()
+    if k in _EV_BOOL or isinstance(v, bool):
+        return "Yes" if v else "No"
+    if isinstance(v, (list, tuple)) and len(v) == 2 and not isinstance(v[0], dict):
+        return f"{v[0]} ({fmt_pct(v[1])})"     # (ticker, pct) e.g. top gainer
+    if k in _EV_MONEY:
+        return fmt_inr(v)
+    if k == "coverage":
+        return f"{v * 100:.0f}%"
+    if k in _EV_PCT:
+        return f"{v:g}%"
+    if isinstance(v, float):
+        return f"{v:g}"
+    return str(v)
+
+
+def render_evidence(ev):
+    """Render an insight's evidence as friendly label/value rows + any detail tables."""
+    scalars = {k: v for k, v in ev.items() if k not in _EV_LIST}
+    if scalars:
+        st.dataframe(
+            pd.DataFrame([{"Metric": _ev_label(k), "Value": _ev_val(k, v)}
+                         for k, v in scalars.items()]),
+            hide_index=True, use_container_width=True)
+    for lk in _EV_LIST:
+        recs = ev.get(lk)
+        if recs:
+            st.caption(_ev_label(lk))
+            st.dataframe(
+                pd.DataFrame([{_ev_label(k): _ev_val(k, v) for k, v in r.items()}
+                             for r in recs]),
+                hide_index=True, use_container_width=True)
+
+
 def render_insight_card(ins, key_prefix=""):
     """One insight as a bordered card: severity chip + title + body + evidence + link."""
     sev = SEVERITY.get(ins.severity, SEVERITY["low"])
@@ -862,8 +929,8 @@ def render_insight_card(ins, key_prefix=""):
         st.markdown(f'<span style="color:{INK_SOFT}">{ins.body}</span>', unsafe_allow_html=True)
         c1, c2 = st.columns([1, 1])
         with c1:
-            with st.expander("Evidence"):
-                st.json(ins.evidence)
+            with st.expander("Why this fired"):
+                render_evidence(ins.evidence)
         with c2:
             if st.button(f"View in {ins.section.split(' ', 1)[-1]} →",
                          key=f"goto_{key_prefix}_{ins.id}", use_container_width=True):

@@ -327,7 +327,7 @@ def detect_tax_loss_opportunity(ctx) -> list:
     loss = float(harvest["Gain/Loss (₹)"].sum())  # negative
     if -loss < TAX_LOSS_MIN:
         return []
-    has_gains = bool(tax) and (tax.get("lt_gain", 0) > 0 or tax.get("st_gain", 0) > 0)
+    has_gains = bool(tax) and bool(tax.get("lt_gain", 0) > 0 or tax.get("st_gain", 0) > 0)
     n = len(harvest)
     title = f"{fmt_inr(abs(loss))} of harvestable losses across {n} position{'s' if n > 1 else ''}"
     body = (f"{n} holding{'s sit' if n > 1 else ' sits'} at an unrealised loss totalling "
