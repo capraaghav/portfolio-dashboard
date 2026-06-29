@@ -27,8 +27,9 @@ Top-level constants and switches:
 - `store = db if USE_DB else storage` — the active persistence module. Both expose
   the same function names, so the rest of the app calls `store.<fn>(...)` uniformly.
 - `MULTIUSER = (not USE_DB) and _is_multiuser()` — local per-session isolation mode.
-- `SECTIONS` — the 11 navigation entries: Overview, Holdings, Performance, Technical,
-  Analysts, Tax, Risk, Dividends, Stock Detail, Watchlist, Rebalance.
+- `SECTIONS` — the 13 navigation entries: Intelligence, Overview, Holdings,
+  Performance, Technical, Screener, Analysts, Tax, Risk, Dividends, Stock Detail,
+  Watchlist, Rebalance.
 
 Selected helpers:
 
@@ -193,6 +194,61 @@ Key public functions:
 
 ---
 
+## `intelligence.py`
+
+**Responsibility.** The AI Portfolio Intelligence Engine's deterministic detection
+layer — pure, no I/O, no Streamlit (like `analytics.py`). Turns existing analytics
+output into ranked, evidence-backed insights plus an explainable health score. Every
+insight is produced by a detector over real metrics; detectors return nothing on
+missing/insufficient data, so the engine never invents a conclusion. The optional
+natural-language layer only paraphrases the deterministic `body` strings — it does not
+create findings. Full design: [../product/EDS-ai-portfolio-intelligence.md](../product/EDS-ai-portfolio-intelligence.md).
+
+Tunables (single tuning surface): concentration thresholds (`TOP1_PCT=25`,
+`TOP5_PCT=60`, `SECTOR_PCT=35`, `EFF_N_FLOOR=5`), `RSI_HI=70`/`RSI_LO=30`,
+`OVER_TARGET=0.10`, `OVER_PE_MULT=1.5`, `TAX_LOSS_MIN=25_000`, and the priority
+weights `W_SEV/W_MAG/W_CONF/W_FRESH = 0.40/0.30/0.20/0.10`.
+
+Models (dataclasses): `Insight` (category, severity, title, body, section, evidence,
+tickers, confidence, magnitude, priority), `HealthScore` (score 0–100, band,
+components), `HealthComponent` (name, subscore, weight, reason).
+
+Key public functions:
+
+- `analyze(holdings, raw, prices, meta, totals, ta_signals, quotes, top_n=5) -> dict` —
+  the entry point. Returns `{"insights": [...], "health": HealthScore, "move": {...},
+  "empty": bool}`. Pure: callers pass already-fetched data, no I/O here.
+- `build_context(holdings, raw, prices, meta, totals, ta_signals, quotes) -> dict` —
+  assembles the evidence context (risk metrics, day move, tax, harvest, sector P/E
+  medians, priced coverage) that detectors read.
+- `detect_all(ctx) -> list[Insight]` — runs the registry; a detector that raises is
+  skipped, never crashes the engine.
+- `rank(insights, top_n=5) -> list[Insight]` — sort by priority
+  (severity × magnitude × confidence × freshness), de-dup on (category, tickers),
+  take top-N.
+- `health_score(ctx) -> HealthScore` — five weighted, explainable sub-scores:
+  Diversification (0.30), Sector balance (0.20), Valuation (0.20), Volatility (0.15),
+  Data quality (0.15). Band: Resilient ≥ 75 · Balanced 50–74 · Watchful 30–49 ·
+  Fragile < 30.
+
+Detectors (`DETECTORS` registry; each is pure `(ctx) -> list[Insight]`) — adding an
+insight type is one function + one registry entry:
+
+- `detect_portfolio_risk` — single-position / top-5 / sector concentration, thin
+  effective-N, off-band beta. Keeps the highest-severity dimension.
+- `detect_technical_extremes` — overbought (RSI ≥ 70), escalated when near a 52-week
+  high; skips N/A-signal stocks.
+- `detect_overvaluation` — trades above analyst mean target (≥ 3 analysts) and/or rich
+  P/E vs the user's own sector median.
+- `detect_tax_loss_opportunity` — aggregate harvestable loss ≥ `TAX_LOSS_MIN`, flagged
+  higher when there are gains to offset.
+- `detect_todays_move` — portfolio day change from quotes × shares, with the lead
+  mover.
+- `detect_data_quality` — count of holdings valued from the file (no live price), so
+  the brief's blind spots are explicit.
+
+---
+
 ## `charts.py`
 
 **Responsibility.** Reusable Plotly figure builders. Each returns a `go.Figure` (or
@@ -221,6 +277,8 @@ Each function takes a prepared DataFrame/Series/dict and returns `go.Figure | No
 - `candlestick(hist, ticker, avg_cost=None)` — OHLC with SMA50/200 and an avg-cost
   line.
 - `wk52_gauge(price, low, high)` — 52-week range gauge.
+- `health_gauge(score, band="")` — 0–100 Portfolio Health gauge (gold bar) for the
+  Intelligence section.
 - `dividend_history(divs)` — per-share dividend bars (last 5 years).
 
 ---
@@ -258,7 +316,9 @@ Theme tokens (hex):
 | `DISABLED` | `#555555` | disabled glyphs / N-A |
 
 Also: `SIGNAL_ORDER` and `SIGNAL_COLOR` (trend signal labels/colours),
-`REC_LABEL` and `REC_COLOR` (analyst recommendation labels/colours).
+`REC_LABEL` and `REC_COLOR` (analyst recommendation labels/colours), and
+`SEVERITY_ORDER` / `SEVERITY` (intelligence-insight severity tokens — glyph + word +
+tint per `high`/`medium`/`low`, so severity never relies on colour alone).
 
 Formatting functions:
 

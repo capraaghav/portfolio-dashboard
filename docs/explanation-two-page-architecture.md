@@ -22,7 +22,7 @@ Streamlit app makes a poor landing page (cold-start spinner, no SEO, heavyweight
    │  index.html  (GitHub Pages)         │          │  app.py  (Streamlit Cloud)          │
    │  static · anonymous · instant       │          │  login + dashboard · per-user state │
    │                                     │          │                                     │
-   │  "Launch dashboard →"  ───────────────────────▶│  (auth gate, then the 11 sections)  │
+   │  "Launch dashboard →"  ───────────────────────▶│  (auth gate, then the 13 sections)  │
    │                                     │          │                                     │
    │◀─────────────────  "New here?       │          │  render_landing():                  │
    │                     See what it does"│         │    "New here? See what it does →"   │

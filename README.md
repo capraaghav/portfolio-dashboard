@@ -100,7 +100,8 @@ overlapping stocks are merged automatically.
 
 | Tab | What it gives you |
 |-----|-------------------|
-| **📊 Overview** | The big picture: a heatmap treemap (box size = how much you hold, colour = profit/loss), allocation by stock and by sector, and a per-account breakdown. Top KPIs show today's change, number of holdings, accounts, and how many prices loaded live. |
+| **🧠 Intelligence** | The most important things about your portfolio today, surfaced first. A portfolio manager's read: ranked, plain-English insights (concentration risk, overbought names, rich valuations, harvestable tax losses, today's move) plus an explainable 0–100 health score. Every insight links to the tab that proves it, and is generated from your own analytics — never invented. |
+| **📊 Overview** | The big picture: a heatmap treemap (box size = how much you hold, colour = profit/loss), allocation by stock and by sector, and a per-account breakdown. Top KPIs show today's change, number of holdings, accounts, and how many prices loaded live. A condensed top-3 intelligence brief sits at the top. |
 | **📋 Holdings** | Your full table — searchable and sortable, filterable by account. Optional fundamentals (P/E, P/B, market cap, beta, 52-week range). **Export to Excel** in one click. Got a stock with no live price? Use the **manual price override**. |
 | **📈 Performance** | Tracks your portfolio value over time via auto-saved daily **snapshots**. Computes **XIRR** (your true annualised return, if you supply purchase dates) and runs a **benchmark backtest** of your current basket against NIFTY 50, SENSEX, Bank Nifty, or Midcap. |
 | **🔬 Technical** | Trend signals for each holding — SMA 20/50/200 and RSI 14, classified from **Strong Bull** to **Strong Bear** — plus price-vs-50MA and RSI charts. |

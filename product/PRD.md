@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Product** | Portfolio Dashboard — unified stock-portfolio analytics for Indian markets (NSE/BSE) |
-| **Document version** | 2.0 |
+| **Document version** | 2.1 |
 | **Status** | Live (shipped) |
-| **Last updated** | 2026-06-24 |
+| **Last updated** | 2026-06-29 |
 | **Owner** | Raaghav Pilaniwala |
 | **Repository** | github.com/capraaghav/portfolio-dashboard |
 | **Landing page** | capraaghav.github.io/portfolio-dashboard/ (standalone GitHub Pages) |
@@ -22,7 +22,8 @@ Excel, or PDF), and the app normalises wildly different broker formats into a si
 dataset, resolves each holding to its live NSE/BSE ticker, fetches live prices and
 fundamentals from Yahoo Finance, and presents valuation, allocation, technicals,
 analyst targets, tax, risk, dividends, per-stock detail, benchmarking, and
-rebalancing across eleven layered sections.
+rebalancing across thirteen layered sections, with an AI intelligence layer that
+surfaces the most important findings first.
 
 ### 1.1 Vision
 
@@ -264,25 +265,27 @@ mis-assigns** — an unresolved holding is kept at its file value rather than gu
 - **FR-4.6** **Per-stock detail** — 1-year OHLC history and recent news, on demand.
 - **FR-4.7** A **"Refresh data"** action clears all caches and re-fetches.
 
-### 6.5 Dashboard — the eleven sections
+### 6.5 Dashboard — the thirteen sections
 Navigation is a left sidebar list (not horizontal tabs); the constant
-`SECTIONS = ["📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical",
-"🎯 Analysts", "🧮 Tax", "⚠️ Risk", "💰 Dividends", "🔍 Stock Detail",
-"👁️ Watchlist", "⚖️ Rebalance"]` defines the order.
+`SECTIONS = ["🧠 Intelligence", "📊 Overview", "📋 Holdings", "📈 Performance",
+"🔬 Technical", "🔎 Screener", "🎯 Analysts", "🧮 Tax", "⚠️ Risk", "💰 Dividends",
+"🔍 Stock Detail", "👁️ Watchlist", "⚖️ Rebalance"]` defines the order.
 
 | # | Section | Requirements |
 |---|---|---|
-| 1 | **📊 Overview** | Treemap heatmap (size = value, colour = P&L, grouped by sector); allocation donuts by stock and by sector; per-account totals table + stacked bar (when >1 account). |
-| 2 | **📋 Holdings** | Sortable/searchable table; toggle fundamentals columns; **export to Excel**; **manual price override**; **click a row → per-account split** of that stock (shares, cost, value, P&L per account + TOTAL) for stocks held in 2+ accounts. **Filters (combinable):** sector, asset type (Equity/Fund/Bond), technical trend signal, account, and a **"held in all accounts only"** toggle — each narrows the table to matching holdings. |
-| 3 | **📈 Performance** | Auto-saved daily **snapshots** → portfolio value timeline; **XIRR** (when purchase dates exist); **benchmark backtest** of the current basket vs a chosen index, with alpha. |
-| 4 | **🔬 Technical** | SMA 20/50/200 + RSI 14 → trend signal per stock (Strong Bull → Strong Bear); signal-count cards; vs-50MA and RSI bar charts. |
-| 5 | **🎯 Analysts** | 12-month consensus price targets (low/mean/high) with upside %, Buy/Hold/Sell consensus, # analysts; target-range chart; coverage count. |
-| 6 | **🧮 Tax** | **LTCG/STCG split** (uses long-term-qty or purchase dates); estimated tax (India rates); tax-loss-harvesting candidates. Headed with an explicit "Estimate only — not tax advice" caption. |
-| 7 | **⚠️ Risk** | Largest position %, top-5 weight, effective # holdings (1/HHI), portfolio beta, sector concentration; concentration warnings. |
-| 8 | **💰 Dividends** | TTM dividend income per stock, portfolio yield, income chart (requires dividend-data toggle). |
-| 9 | **🔍 Stock Detail** | Per-stock candlestick (1y) with SMA + avg-cost line, 52-week gauge, fundamentals, analyst consensus, dividend history, recent news (live-priced equities only). Reachable by clicking through from other sections. |
-| 10 | **👁️ Watchlist** | Track non-owned tickers (live price, day change, analyst target); persisted. |
-| 11 | **⚖️ Rebalance** | Editable target weights → drift and ₹ to buy/sell per holding; **never executes**. |
+| 1 | **🧠 Intelligence** | AI Portfolio Intelligence Engine (§6.10): ranked, evidence-backed insights + an explainable 0–100 Portfolio Health Score; today's-move card; per-insight evidence and a link to the proving section. Generated deterministically from the other sections' analytics — never invented. |
+| 2 | **📊 Overview** | Condensed top-3 intelligence brief; treemap heatmap (size = value, colour = P&L, grouped by sector); allocation donuts by stock and by sector; per-account totals table + stacked bar (when >1 account). |
+| 3 | **📋 Holdings** | Sortable/searchable table; toggle fundamentals columns; **export to Excel**; **manual price override**; **click a row → per-account split** of that stock (shares, cost, value, P&L per account + TOTAL) for stocks held in 2+ accounts. **Filters (combinable):** sector, asset type (Equity/Fund/Bond), technical trend signal, account, and a **"held in all accounts only"** toggle — each narrows the table to matching holdings. |
+| 4 | **📈 Performance** | Auto-saved daily **snapshots** → portfolio value timeline; **XIRR** (when purchase dates exist); **benchmark backtest** of the current basket vs a chosen index, with alpha. |
+| 5 | **🔬 Technical** | SMA 20/50/200 + RSI 14 → trend signal per stock (Strong Bull → Strong Bear); signal-count cards; vs-50MA and RSI bar charts. |
+| 6 | **🔎 Screener** | Find *new* stocks: scans the Nifty 500 / Nifty 50 (or an uploaded watchlist, or held stocks) for a momentum setup — SMA10 crossing SMA50 with RSI in a healthy 50–65 band — showing why each passed/failed, with CSV/Excel export. |
+| 7 | **🎯 Analysts** | 12-month consensus price targets (low/mean/high) with upside %, Buy/Hold/Sell consensus, # analysts; target-range chart; coverage count. |
+| 8 | **🧮 Tax** | **LTCG/STCG split** (uses long-term-qty or purchase dates); estimated tax (India rates); tax-loss-harvesting candidates. Headed with an explicit "Estimate only — not tax advice" caption. |
+| 9 | **⚠️ Risk** | Largest position %, top-5 weight, effective # holdings (1/HHI), portfolio beta, sector concentration; concentration warnings. |
+| 10 | **💰 Dividends** | TTM dividend income per stock, portfolio yield, income chart (requires dividend-data toggle). |
+| 11 | **🔍 Stock Detail** | Per-stock candlestick (1y) with SMA + avg-cost line, 52-week gauge, fundamentals, analyst consensus, dividend history, recent news (live-priced equities only). Reachable by clicking through from other sections. |
+| 12 | **👁️ Watchlist** | Track non-owned tickers (live price, day change, analyst target); persisted. |
+| 13 | **⚖️ Rebalance** | Editable target weights → drift and ₹ to buy/sell per holding; **never executes**. |
 
 ### 6.6 Summary cards (always visible)
 Total value, total gain/loss (₹ + %), today's change, # holdings, # accounts, live
@@ -339,6 +342,47 @@ the app runs with no login, exactly as the local-first product.*
   from each click (ported from a React component to a Streamlit-injected canvas overlay
   that persists across reruns). Purely decorative; non-blocking; respects
   `prefers-reduced-motion`.
+
+### 6.10 AI Portfolio Intelligence Engine
+A premium intelligence layer that reviews the portfolio every time the dashboard opens
+and answers **"what are the most important things I should know about my portfolio
+today?"** It detects, ranks, and explains the findings an institutional portfolio
+manager would flag. Its defining constraint: **the engine never invents conclusions.**
+Every insight is produced by a deterministic detector over the analytics the app
+already computes; the (optional) natural-language layer only summarises evidence that
+already exists. The full design lives in
+[`EDS-ai-portfolio-intelligence.md`](EDS-ai-portfolio-intelligence.md).
+
+- **FR-10.1** **Deterministic detection.** Insights are generated by pure detectors
+  (`intelligence.py`, no I/O, like `analytics.py`) over holdings, risk metrics, TA
+  signals, tax, metadata, and quotes. A detector that lacks sufficient/fresh data
+  returns nothing rather than guessing.
+- **FR-10.2** **Insight catalogue (v1).** Portfolio Risk (single-position / top-5 /
+  sector concentration, thin effective-N, off-band beta), Technical Extremes (overbought
+  RSI, escalated near a 52-week high), Overvaluation (above analyst mean target and/or
+  rich P/E vs sector median), Tax-Loss Opportunity (harvestable losses, flagged when
+  gains exist to offset), Today's Move, and Data-Quality (un-priced holdings). Each
+  carries a category, severity, confidence, evidence object, and a link to the section
+  that proves it.
+- **FR-10.3** **Priority ranking.** Insights are ranked by a deterministic score
+  (severity × magnitude × confidence × freshness), de-duplicated, and the top N surfaced
+  (top 5 in the section, top 3 in the Overview brief).
+- **FR-10.4** **Portfolio Health Score.** A 0–100, fully explainable score from five
+  named, weighted sub-scores — Diversification (0.30), Sector balance (0.20), Valuation
+  (0.20), Volatility (0.15), Data quality (0.15) — with a band (Resilient / Balanced /
+  Watchful / Fragile) and a per-component breakdown. No opaque number; every point
+  traces to a metric.
+- **FR-10.5** **Evidence & traceability.** Every insight exposes the exact metric values
+  and thresholds that fired it, and links to the proving section. The product's honesty
+  posture, made into a feature.
+- **FR-10.6** **Optional, gracefully-degrading AI narration.** A natural-language layer
+  may paraphrase each insight's deterministic body, but only under a closed-world prompt
+  constrained to that insight's evidence, with post-generation validation; if no AI is
+  configured or it is unreachable, the deterministic templates render with no functional
+  difference. AI is opt-in and never a dependency.
+- **FR-10.7** **Not advice.** The engine is not an automated trading system, not
+  financial advice, and not predictive — it describes the present state and known facts,
+  carrying the same "information, not advice" caption as the Tax section (§4.3).
 
 ---
 
@@ -404,10 +448,12 @@ carries the analytics.
 
 | Module | Responsibility |
 |---|---|
-| `app.py` | UI orchestration: sidebar, data-loading pipeline, summary cards, the 11 sections, hosting/multi-user gating, the backend selector (`store = db if db.is_enabled() else storage`), and the auth gate (incl. the 2FA step). |
+| `app.py` | UI orchestration: sidebar, data-loading pipeline, summary cards, the 13 sections, hosting/multi-user gating, the backend selector (`store = db if db.is_enabled() else storage`), and the auth gate (incl. the 2FA step). |
 | `parsers.py` | File reading + broker detection + normalisation to the canonical schema; CSV/Excel/PDF; company-name cleaning; ISIN/series-suffix handling. |
 | `market_data.py` | All Yahoo Finance fetching (quotes, metadata, TA history, dividends, benchmarks, per-stock detail), the 3-pass resolution chain, and the NSE master fetch. Cached. |
 | `analytics.py` | Pure (no-I/O) computation: holdings consolidation, totals, per-account breakdown, technical indicators, risk metrics, LTCG/STCG tax, XIRR, synthetic backtest curve, rebalancing. |
+| `intelligence.py` | **AI Portfolio Intelligence Engine** (§6.10) — pure (no-I/O) detection over `analytics` output: `Insight`/`HealthScore` models, a detector registry, priority ranking, and the explainable health score. `analyze()` is the entry point; detectors never invent — they return nothing on missing data. |
+| `screener.py` | Momentum screener helpers (watchlist-upload parsing) for the 🔎 Screener section; scans an equity universe for SMA10/50 crossovers with a healthy RSI band. |
 | `charts.py` | Reusable Plotly figure builders (treemap, donuts, candlestick, benchmark overlay, etc.). |
 | `storage.py` | Local persistence (snapshots, last session, watchlist, overrides); configurable data directory for per-session isolation. |
 | `db.py` | **Optional Supabase backend** — email auth (sign-in/up/out, cookie-based session restore, **email-OTP 2FA**) + per-user cloud storage, mirroring `storage.py`'s signatures as a drop-in alternative; per-session client; activates only when secrets are present. |
@@ -418,7 +464,8 @@ carries the analytics.
 ### 8.3 Data flow
 `upload → parsers.parse_all → market_data.resolve_symbols (3-pass) → rename to clean
 tickers → market_data.fetch_quotes (+ optional metadata/TA/dividends) →
-analytics.build_holdings → sections render via charts + formatting.`
+analytics.build_holdings → intelligence.analyze (deterministic insights + health score)
+→ sections render via charts + formatting.`
 
 ### 8.4 Storage / hosting modes
 
