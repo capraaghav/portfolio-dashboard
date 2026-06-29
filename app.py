@@ -867,7 +867,7 @@ def render_insight_card(ins, key_prefix=""):
         with c2:
             if st.button(f"View in {ins.section.split(' ', 1)[-1]} →",
                          key=f"goto_{key_prefix}_{ins.id}", use_container_width=True):
-                st.session_state["nav"] = ins.section
+                st.session_state["_goto_section"] = ins.section
                 st.rerun()
 
 
@@ -970,7 +970,7 @@ if section == "📊 Overview":
             bh2.metric("Health", f"{intel['health'].score}", help=intel["health"].band)
         render_brief(_brief, limit=3)
         if st.button("See full intelligence brief →", key="overview_to_intel"):
-            st.session_state["nav"] = "🧠 Intelligence"
+            st.session_state["_goto_section"] = "🧠 Intelligence"
             st.rerun()
         st.divider()
 
