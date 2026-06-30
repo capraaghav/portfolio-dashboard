@@ -205,6 +205,31 @@ def render_landing(subline: str) -> None:
 """, unsafe_allow_html=True)
 
 
+# Bundled onboarding sample — two demo accounts fed through the real parser so a
+# new visitor sees a populated, insight-rich dashboard without owning a broker file.
+_DEMO_FILES = [("demo_long_term.csv", "Demo — Long Term"),
+               ("demo_trading.csv", "Demo — Trading")]
+
+
+@st.cache_data(show_spinner=False)
+def load_demo() -> "pd.DataFrame | None":
+    """Parse the bundled sample CSVs into the canonical raw schema (no I/O on disk
+    beyond reading the shipped files; routed through parsers.parse_all like a real
+    upload). Cached — the files never change."""
+    sample_dir = Path(__file__).parent / "data" / "sample"
+    uploads, names = [], {}
+    for fname, label in _DEMO_FILES:
+        path = sample_dir / fname
+        if not path.exists():
+            return None
+        buf = io.BytesIO(path.read_bytes())
+        buf.name = fname
+        uploads.append(buf)
+        names[fname] = label
+    raw_df, _ = parse_all(uploads, names)
+    return raw_df
+
+
 # Auth gate. Logged-out visitors get a compact hero + the login form. The full
 # marketing page lives separately at index.html (its CTA opens this app).
 if USE_DB:
@@ -333,6 +358,19 @@ with st.sidebar:
                     st.error(err)
     # A click-through from another tab (e.g. Technical) parks the target section
     # here; apply it before the radio instantiates so it lands selected.
+    # Initialise the data-toggle defaults once (so the toggles can be widget-keyed
+    # and still programmatically set — e.g. by the sample-data demo — without the
+    # value=/key= conflict).
+    for _k, _d in (("load_meta", True), ("load_ta", False), ("load_div", False)):
+        st.session_state.setdefault(_k, _d)
+    # Freshly-loaded sample demo: turn on depth toggles and land on Intelligence,
+    # all BEFORE the toggle/radio widgets instantiate (same pre-widget pattern).
+    if st.session_state.get("_demo") and not st.session_state.get("_demo_seeded"):
+        st.session_state["load_meta"] = True
+        st.session_state["load_ta"] = True
+        st.session_state["load_div"] = True
+        st.session_state["_goto_section"] = "🧠 Intelligence"
+        st.session_state["_demo_seeded"] = True
     if "_goto_section" in st.session_state:
         st.session_state["nav"] = st.session_state.pop("_goto_section")
     section = st.radio("Navigation", SECTIONS, label_visibility="collapsed", key="nav")
@@ -359,15 +397,21 @@ with st.sidebar:
                 st.info(f"Last session: **{meta_info.get('rows', '?')} rows** "
                         f"saved {meta_info.get('saved_at', '')[:16].replace('T', ' ')}")
                 use_saved = st.button("↩️ Load last session", width='stretch')
+            if st.button("✨ Load sample portfolio", width='stretch',
+                         help="Explore the dashboard with a demo portfolio — no file needed."):
+                st.session_state["_demo"] = True
+                st.session_state["_demo_seeded"] = False
+                st.session_state["_use_saved"] = False
+                st.rerun()
 
         st.divider()
         exclude_nonequity = st.toggle("Equity only (remove funds & bonds)", value=False,
                                       help="Drops mutual funds and bonds/NCDs from the entire dashboard.")
-        load_meta = st.toggle("Sectors, targets & fundamentals", value=True,
+        load_meta = st.toggle("Sectors, targets & fundamentals", key="load_meta",
                               help="One Yahoo Finance .info call per stock. Slower on first load, cached 1 hour.")
-        load_ta = st.toggle("Technical analysis (SMA / RSI)", value=False,
+        load_ta = st.toggle("Technical analysis (SMA / RSI)", key="load_ta",
                             help="Bulk-downloads price history. ~10s first load, cached 1 hour.")
-        load_div = st.toggle("Dividend data", value=False,
+        load_div = st.toggle("Dividend data", key="load_div",
                              help="Fetches dividend history per stock for the Dividends section.")
 
         if st.button("🔄 Refresh data (clear cache)", width='stretch'):
@@ -406,11 +450,17 @@ unknown names fall back to the NSE official list, then a web search).
 
 raw: pd.DataFrame | None = None
 if uploaded:
+    st.session_state["_demo"] = False     # a real upload always wins over the demo
     raw, parse_errors = parse_all(uploaded, account_names)
     for fname, err in parse_errors:
         st.error(f"**`{fname}`** — {err}")
     if raw is not None:
         store.save_session(raw)
+    st.session_state["_use_saved"] = False
+elif st.session_state.get("_demo"):
+    # Sample portfolio — parsed from the bundled CSVs; never persisted, so it can't
+    # overwrite a real saved session.
+    raw = load_demo()
     st.session_state["_use_saved"] = False
 elif use_saved or st.session_state.get("_use_saved"):
     # Keep the loaded session across reruns (the button is one-shot) so filters/
@@ -640,7 +690,26 @@ if section == "🔎 Screener":
 
 if raw is None or raw.empty:
     render_landing("⚙️ Open <b>Upload / Data</b> in the sidebar and drop your broker file to begin.")
+    _, cmid, _ = st.columns([1, 1.4, 1])
+    with cmid:
+        st.write("")
+        if st.button("✨ Try it with sample data →", width='stretch', type="primary"):
+            st.session_state["_demo"] = True
+            st.session_state["_demo_seeded"] = False
+            st.session_state["_use_saved"] = False
+            st.rerun()
+        st.caption("Loads a demo portfolio so you can explore everything — "
+                   "no file, nothing saved. Your own upload replaces it anytime.")
     st.stop()
+
+if st.session_state.get("_demo"):
+    _bnl, _bnr = st.columns([6, 1])
+    _bnl.info("✨ You're viewing **sample data** — explore freely. "
+              "Upload your own broker file in the sidebar to replace it.")
+    if _bnr.button("Clear", help="Exit the sample portfolio", width='stretch'):
+        st.session_state["_demo"] = False
+        st.session_state["_demo_seeded"] = False
+        st.rerun()
 
 # ─── Global account selector — scope the whole dashboard to chosen accounts ───
 # Lives in the sidebar (a second `with st.sidebar` block, rendered after raw is
@@ -944,9 +1013,92 @@ def render_brief(insights, limit=3):
         render_insight_card(ins, key_prefix="brief")
 
 
+def render_checklist():
+    """Getting-started checklist — ticks off as the user explores. Session-only."""
+    if st.session_state.get("_checklist_hidden"):
+        return
+    try:
+        has_watch = len(store.load_watchlist()) > 0
+    except Exception:
+        has_watch = False
+    items = [
+        ("Load a portfolio", True),  # past the data guard → always done here
+        ("Open the Intelligence brief", bool(st.session_state.get("_seen_intel"))),
+        ("Turn on Technical analysis", bool(st.session_state.get("load_ta"))),
+        ("Explore 3 sections", len(st.session_state.get("_seen_sections", set())) >= 3),
+        ("Add a stock to your Watchlist", has_watch),
+    ]
+    done = sum(d for _, d in items)
+    if done == len(items):          # fully complete → retire it
+        st.session_state["_checklist_hidden"] = True
+        return
+    with st.expander(f"🚀 Getting started · {done}/{len(items)}", expanded=(done < 2)):
+        for label, ok in items:
+            st.markdown(f"{'✅' if ok else '⬜'} {label}")
+        if st.button("Dismiss", key="checklist_dismiss"):
+            st.session_state["_checklist_hidden"] = True
+            st.rerun()
+
+
+_TOUR_STEPS = [
+    ("Welcome to your desk",
+     "You're in. Pick any of the **13 sections** from the sidebar on the left — they run "
+     "from the big picture down to deep analysis."),
+    ("🧠 Intelligence reads it for you",
+     "The Intelligence section reviews your whole portfolio and surfaces what matters "
+     "today — ranked, with the evidence behind every call."),
+    ("Go deeper with the toggles",
+     "Flip on **Technical / Dividends / Fundamentals** in the sidebar's Upload / Data "
+     "panel. The deeper sections light up and Intelligence gets sharper."),
+    ("Every claim is traceable",
+     "On any insight, open **Why this fired** to see the exact numbers behind it. "
+     "Nothing is invented."),
+    ("Private by default",
+     "Your data is processed locally and never sold. Upload your own broker file in the "
+     "sidebar anytime to replace the sample."),
+]
+
+
+def render_tour():
+    """Lightweight coach-mark tour (session-only). A pinned card at the top of the
+    main area; Back / Next / Skip step through it."""
+    step = st.session_state.get("_tour_step", 1)
+    if not (1 <= step <= len(_TOUR_STEPS)):
+        return
+    title, body = _TOUR_STEPS[step - 1]
+    with st.container(border=True):
+        st.markdown(
+            f'<span style="color:{GOLD};font-weight:700;letter-spacing:0.04em">'
+            f'GETTING ORIENTED · {step}/{len(_TOUR_STEPS)}</span>', unsafe_allow_html=True)
+        st.markdown(f"**{title}**")
+        st.markdown(f'<span style="color:{INK_SOFT}">{body}</span>', unsafe_allow_html=True)
+        cback, cnext, cskip = st.columns([1, 1, 1])
+        if step > 1 and cback.button("← Back", key="tour_back", use_container_width=True):
+            st.session_state["_tour_step"] = step - 1
+            st.rerun()
+        _last = step == len(_TOUR_STEPS)
+        if cnext.button("Done ✓" if _last else "Next →", key="tour_next",
+                        use_container_width=True, type="primary"):
+            st.session_state["_tour_step"] = 0 if _last else step + 1
+            st.rerun()
+        if cskip.button("Skip", key="tour_skip", use_container_width=True):
+            st.session_state["_tour_step"] = 0
+            st.rerun()
+
+
+# Onboarding: track exploration (session-only) + show the coach tour above sections.
+_seen = st.session_state.setdefault("_seen_sections", set())
+_seen.add(section)
+if section == "🧠 Intelligence":
+    st.session_state["_seen_intel"] = True
+st.session_state.setdefault("_tour_step", 1)
+render_tour()
+
+
 # ═══ INTELLIGENCE ═════════════════════════════════════════════════════════════
 if section == "🧠 Intelligence":
     st.markdown('<div class="hero-label">INTELLIGENCE</div>', unsafe_allow_html=True)
+    render_checklist()
     cse, cre = st.columns([4, 1])
     cse.subheader("What matters about your portfolio today")
     if cre.button("↻ Re-analyse", use_container_width=True):
