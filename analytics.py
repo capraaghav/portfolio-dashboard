@@ -462,3 +462,13 @@ def calculate_screening_metrics(
                  "distance_pct", "sma10_above", "wk52_high", "wk52_low"]
     )
     return df, skipped
+
+
+def tradingview_list(tickers, suffix_map: dict | None = None, header: str | None = None) -> str:
+    """Comma-separated EXCHANGE:SYMBOL string for TradingView watchlist import.
+    `.BO` suffix → BSE:, anything else → NSE:. Optional `###header,` section prefix."""
+    suffix_map = suffix_map or {}
+    syms = [f"{'BSE' if suffix_map.get(t) == '.BO' else 'NSE'}:{t}"
+            for t in tickers if t]
+    body = ", ".join(syms)
+    return f"###{header},{body}" if header else body
