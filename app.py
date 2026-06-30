@@ -19,6 +19,7 @@ import streamlit as st
 import analytics
 import charts
 import db
+import earnings
 import intelligence
 import market_data as md
 import parsers
@@ -328,7 +329,8 @@ def _plotly_clicked_ticker(ev) -> str | None:
 # ─── Sidebar: brand + navigation + upload/data ───────────────────────────────
 
 SECTIONS = ["🧠 Intelligence", "📊 Overview", "📋 Holdings", "📈 Performance", "🔬 Technical", "🔎 Screener",
-            "🎯 Analysts", "🧮 Tax", "⚠️ Risk", "💰 Dividends", "🔍 Stock Detail", "👁️ Watchlist", "⚖️ Rebalance"]
+            "🎯 Analysts", "🧮 Tax", "⚠️ Risk", "💰 Dividends", "📅 Earnings Calendar",
+            "🔍 Stock Detail", "👁️ Watchlist", "⚖️ Rebalance"]
 
 with st.sidebar:
     st.markdown('<div class="brand-title">PORTFOLIO</div>'
@@ -1378,6 +1380,12 @@ elif section == "📋 Holdings":
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                            width='stretch')
 
+    with st.expander("📋 Copy to TradingView"):
+        st.caption("Copy, then paste into TradingView → Watchlist → ⋯ → Import list.")
+        st.code(analytics.tradingview_list(fh["Ticker"], suffix_map,
+                                           header=f"Portfolio {pd.Timestamp.now():%d %b %Y}"),
+                language=None)
+
     # Manual price overrides for un-priced tickers
     if failed_tickers:
         with st.expander(f"✏️ Set manual prices for {len(failed_tickers)} un-priced ticker(s)"):
@@ -1786,6 +1794,97 @@ elif section == "💰 Dividends":
             st.dataframe(ddd, width='stretch', hide_index=True)
 
 
+# ═══ EARNINGS CALENDAR ════════════════════════════════════════════════════════
+elif section == "📅 Earnings Calendar":
+    import calendar as _cal
+    from datetime import date as _date
+    st.subheader("Earnings Calendar")
+    st.caption("Upcoming corporate events for your portfolio. Dates from Yahoo Finance; "
+               "estimated and subject to company reschedules — information, not advice.")
+
+    # Controls: view, watchlist toggle, type filters
+    cc1, cc2 = st.columns([2, 2])
+    with cc1:
+        view = st.radio("View", ["List", "Monthly"], horizontal=True, label_visibility="collapsed")
+    with cc2:
+        incl_watch = st.toggle("Include watchlist stocks", value=False,
+                               disabled=not st.session_state.watchlist)
+    types_on = st.multiselect("Event types", earnings.EVENT_TYPES, default=earnings.EVENT_TYPES,
+                              format_func=lambda t: f"{earnings.EVENT_META[t]['emoji']} {t}")
+
+    # Symbol universe + name/website maps (portfolio always; watchlist optional)
+    syms = list(holdings["Ticker"])
+    names = dict(zip(holdings["Ticker"], holdings["Company"]))
+    if incl_watch:
+        for w in st.session_state.watchlist:
+            if w not in names:
+                syms.append(w)
+                names[w] = w  # ponytail: ticker as name for watchlist; no extra meta fetch
+    fundamentals = meta.get("fundamentals", {}) if load_meta else {}
+
+    with st.spinner("Fetching corporate events…"):
+        edates = md.fetch_earnings_events(tuple(syms), suffix_map)
+    events = [e for e in earnings.build_events(syms, names, edates, fundamentals)
+              if e.type in types_on]
+
+    # Legend
+    st.markdown(" ".join(f"{earnings.EVENT_META[t]['emoji']} {t}" for t in earnings.EVENT_TYPES))
+
+    if not events:
+        st.info("No upcoming corporate events found for these stocks. Yahoo Finance only "
+                "publishes quarterly-results dates; earnings-call and presentation dates "
+                "are not available from a free source yet.")
+    elif view == "List":
+        _STATUS_DOT = {"Upcoming": "🟢", "Today": "🟡", "Completed": "⚪"}
+        rows = [{
+            "When": e.when.strftime("%d %b %Y"),
+            "Days": ("Today" if e.days_remaining == 0
+                     else f"{e.days_remaining}d" if e.days_remaining > 0
+                     else f"{-e.days_remaining}d ago"),
+            "Status": f"{_STATUS_DOT.get(e.status, '')} {e.status}",
+            "Event": f"{e.emoji} {e.type}",
+            "Company": e.company, "Symbol": e.symbol, "Quarter": e.quarter,
+        } for e in events]
+        st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
+
+        with st.expander("Event details"):
+            pick = st.selectbox("Select an event",
+                                [f"{e.emoji} {e.symbol} — {e.when.strftime('%d %b %Y')}" for e in events])
+            e = events[[f"{x.emoji} {x.symbol} — {x.when.strftime('%d %b %Y')}" for x in events].index(pick)]
+            st.markdown(f"**{e.company}** ({e.symbol})")
+            st.markdown(f"- **Event:** {e.emoji} {e.type}")
+            st.markdown(f"- **Date:** {e.when.strftime('%A, %d %B %Y')}")
+            st.markdown(f"- **Quarter:** {e.quarter or '—'}")
+            st.markdown(f"- **Status:** {e.status} ({e.days_remaining} days)")
+            st.markdown(f"- {e.description}")
+            if e.ir_url:
+                st.markdown(f"- **Investor Relations:** [{e.ir_url}]({e.ir_url})")
+    else:  # Monthly
+        by_date = {}
+        for e in events:
+            by_date.setdefault(e.when, []).append(e)
+        months = sorted({_date(d.year, d.month, 1) for d in by_date})
+        msel = st.selectbox("Month", months, format_func=lambda m: m.strftime("%B %Y"))
+        st.caption(f"{_cal.day_abbr[0]}–{_cal.day_abbr[6]} · Mon-first")
+        grid = "<table style='width:100%;border-collapse:collapse;table-layout:fixed'>"
+        grid += "<tr>" + "".join(
+            f"<th style='padding:4px;color:{MUTED};font-weight:500'>{_cal.day_abbr[i]}</th>"
+            for i in range(7)) + "</tr>"
+        for week in _cal.Calendar(firstweekday=0).monthdatescalendar(msel.year, msel.month):
+            grid += "<tr>"
+            for day in week:
+                dim = day.month != msel.month
+                marks = "".join(ev.emoji for ev in by_date.get(day, []))
+                fg = DISABLED if dim else TEXT
+                grid += (f"<td style='border:1px solid {BORDER};vertical-align:top;height:64px;"
+                         f"padding:4px;color:{fg}'>"
+                         f"<div style='font-size:12px'>{day.day}</div>"
+                         f"<div style='font-size:16px'>{marks}</div></td>")
+            grid += "</tr>"
+        grid += "</table>"
+        st.markdown(grid, unsafe_allow_html=True)
+
+
 # ═══ STOCK DETAIL ═════════════════════════════════════════════════════════════
 elif section == "🔍 Stock Detail":
     st.subheader("Stock Detail")
@@ -1918,6 +2017,9 @@ elif section == "👁️ Watchlist":
                           "Target (₹)": fmt_inr(tgt), "Upside": fmt_pct((tgt/price-1)*100) if (tgt and price) else "—",
                           "Consensus": REC_LABEL.get(a.get("rec_key", ""), "—")})
         st.dataframe(pd.DataFrame(wrows), width='stretch', hide_index=True)
+        with st.expander("📋 Copy to TradingView"):
+            st.caption("Copy, then paste into TradingView → Watchlist → ⋯ → Import list.")
+            st.code(analytics.tradingview_list(wl, wsuffix, header="Watchlist"), language=None)
         rm_t = st.selectbox("Remove ticker", ["—"] + list(wl))
         if rm_t != "—" and st.button("Remove"):
             st.session_state.watchlist.remove(rm_t)

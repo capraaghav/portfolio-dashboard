@@ -13,6 +13,7 @@ the cache key. We use that to pass the resolved-suffix map without breaking cach
 """
 
 from __future__ import annotations
+import datetime
 import difflib
 import io
 import re
@@ -371,6 +372,7 @@ def _fetch_meta_one(ticker: str, suffix: str) -> tuple:
             "wk52_high":   _f(info.get("fiftyTwoWeekHigh")),
             "wk52_low":    _f(info.get("fiftyTwoWeekLow")),
             "industry":    info.get("industry"),
+            "website":     info.get("website"),  # IR link for Earnings Calendar
         }
         return ticker, sector, name, analyst, fundamentals
     except Exception:
@@ -395,6 +397,38 @@ def fetch_metadata(tickers: tuple, _suffix_map: dict) -> dict:
             analyst[ticker] = adata
             fundamentals[ticker] = fdata
     return {"sectors": sectors, "names": names, "analyst": analyst, "fundamentals": fundamentals}
+
+
+def _earnings_date_one(ticker: str, suffix: str):
+    """Next earnings date from Yahoo's calendar, or None. Never raises."""
+    try:
+        cal = yf.Ticker(ticker + suffix).calendar or {}
+        dates = cal.get("Earnings Date") or []
+        if isinstance(dates, (list, tuple)):
+            dates = [d for d in dates if d is not None]
+            d = min(dates) if dates else None
+        else:
+            d = dates or None
+        return d.date() if isinstance(d, datetime.datetime) else d
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def fetch_earnings_events(tickers: tuple, _suffix_map: dict) -> dict:
+    """{ticker: next earnings date | None}. One failing ticker never breaks the rest.
+    Cached 6h — corporate-event dates move on the order of days, not minutes."""
+    out = {}
+    if not tickers:
+        return out
+    with ThreadPoolExecutor(max_workers=min(8, len(tickers))) as ex:
+        futures = {
+            ex.submit(_earnings_date_one, t, _suffix_map.get(t, ".NS")): t
+            for t in tickers
+        }
+        for future in as_completed(futures):
+            out[futures[future]] = future.result()
+    return out
 
 
 # ─── Technical analysis (200d history → signals) ─────────────────────────────
