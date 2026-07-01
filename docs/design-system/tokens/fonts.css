@@ -1,0 +1,15 @@
+/* ============================================================================
+   FONTS — Inter, the one family.
+   "The One Family Rule": Inter carries the entire system — headings, labels,
+   buttons, body, and dense tabular data. Hierarchy is by weight (400→800) and
+   size, never by pairing a second face. Loaded from Google Fonts, exactly as
+   the production app does (app.py @imports the same URL). Inter's tabular
+   numerals give aligned, non-jittery figures across all financial tables.
+   ============================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* No separate mono family — tabular figures come from Inter's own numerals. */
+  --font-mono: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}

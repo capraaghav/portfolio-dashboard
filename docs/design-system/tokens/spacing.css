@@ -1,0 +1,23 @@
+/* ============================================================================
+   SPACING — the tight, reflective rhythm of the desk.
+   Values from docs/design-system.md. The system is dense where the data earns
+   it; spacing is measured, not generous-by-default.
+   ============================================================================ */
+:root {
+  --space-xs: 0.2rem;   /* 3px  — hairline gaps, delta offset */
+  --space-sm: 0.5rem;   /* 8px  — icon/label gap, chip padding */
+  --space-md: 0.7rem;   /* 11px — nav-item padding, control gap */
+  --space-lg: 1.1rem;   /* 18px — card padding, section rhythm */
+  --space-xl: 1.4rem;   /* 22px — block separation */
+  --space-2xl: 2rem;    /* 32px — major section gaps */
+  --space-3xl: 3rem;    /* 48px — page-level padding */
+
+  /* Canonical card paddings from the component specs */
+  --pad-metric-card: 1rem 1.1rem;
+  --pad-container-card: 1.1rem;
+  --pad-button: 0.4rem 0.9rem;
+  --pad-nav-item: 0.5rem 0.7rem;
+
+  --page-max: 1400px;   /* app content max width */
+  --prose-max: 72ch;    /* cap prose at 65–75ch */
+}

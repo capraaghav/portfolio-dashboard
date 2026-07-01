@@ -1,0 +1,62 @@
+/* ============================================================================
+   COLORS — "The After-Hours Desk"
+   A near-black room lit by a single warm lamp (champagne gold), with mint and
+   coral reserved strictly for profit and loss. Depth comes from tonal layering,
+   never shadow. Source of truth: formatting.py + docs/design-system.md.
+   ============================================================================ */
+:root {
+  /* ── Canvas + panel steps (each a controlled half-step lighter) ─────────── */
+  --bg: #0A0A0A;                 /* Room Black — the app canvas */
+  --sidebar: #0C0C0C;            /* sidebar surface */
+  --surface-container: #121212;  /* container cards (charts/tables wrapper) */
+  --surface: #141414;            /* metric cards / panels */
+  --hover: #161616;              /* control / nav hover, secondary button bg */
+  --selected: #18170F;           /* gold-tinted black — active nav row */
+  --shimmer: #1F1F1F;            /* skeleton-loader sweep highlight (== grid) */
+  --grid: #1F1F1F;               /* chart gridlines */
+
+  /* ── Hairline borders (whispers, never strokes) ─────────────────────────── */
+  --border-hair: #1C1C1C;        /* dividers, sidebar edge, tab underline */
+  --border-container: #232323;   /* container-card border */
+  --border-card: #262626;        /* metric-card border */
+  --border-control: #2A2A2A;     /* button / control border */
+
+  /* ── Ink ramp (five greys, near-white → disabled) ───────────────────────── */
+  --ink: #EDEDED;                /* primary text */
+  --ink-soft: #B9B9B9;           /* nav label default, secondary prose */
+  --muted: #8B8B8B;              /* labels / secondary (5.8:1 on bg — AA) */
+  --muted-deep: #808080;         /* tertiary text floor (5.0:1 — AA) */
+  --disabled: #555555;           /* disabled glyphs / N-A (non-text only) */
+
+  /* ── The one lamp + P&L ─────────────────────────────────────────────────── */
+  --gold: #C9A87A;               /* champagne gold — the single accent */
+  --gain: #3DDC97;               /* mint — positive P&L */
+  --gain-deep: #1F9E6B;          /* deep gain — Strong Bullish, heatmap pole */
+  --loss: #F0564A;               /* coral — negative P&L */
+  --loss-deep: #A8362C;          /* deep loss — Strong Bearish, heatmap pole */
+
+  /* ── Gold focus ring ────────────────────────────────────────────────────── */
+  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--gold) 45%, transparent);
+
+  /* ── Semantic aliases (write intent, not raw values, in components) ──────── */
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-soft);
+  --text-muted: var(--muted);
+  --text-tertiary: var(--muted-deep);
+  --text-accent: var(--gold);
+
+  --surface-app: var(--bg);
+  --surface-card: var(--surface);
+  --surface-panel: var(--surface-container);
+  --surface-nav: var(--sidebar);
+  --surface-hover: var(--hover);
+  --surface-selected: var(--selected);
+
+  --border-default: var(--border-card);
+  --border-strong: var(--border-control);
+  --border-subtle: var(--border-hair);
+
+  --accent: var(--gold);
+  --positive: var(--gain);
+  --negative: var(--loss);
+}

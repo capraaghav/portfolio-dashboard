@@ -1,0 +1,45 @@
+/* ============================================================================
+   TYPOGRAPHY — one family (Inter), hierarchy by weight + size.
+   Headings are weighted and slightly negative-tracked; labels are the opposite
+   — small, semibold, positively tracked into quiet uppercase ("Quiet Caps").
+   Values in rem match docs/design-system.md exactly.
+   ============================================================================ */
+:root {
+  --font-family: var(--font-sans);
+
+  /* ── Weights ─────────────────────────────────────────────────────────────  */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-black: 800;
+
+  /* ── Role sizes ─────────────────────────────────────────────────────────── */
+  --fs-display: 3.4rem;    /* centered hero portfolio value (gold), once per view */
+  --fs-title: 1.65rem;     /* metric-card values — the per-card numbers */
+  --fs-headline: 1.5rem;   /* section titles within a tab */
+  --fs-brand: 1.3rem;      /* PORTFOLIO sidebar wordmark */
+  --fs-body-lg: 1.05rem;   /* lede / intro prose */
+  --fs-body: 0.95rem;      /* nav labels, control text, prose */
+  --fs-label: 0.72rem;     /* metric-card labels, eyebrow — quiet caps */
+
+  /* ── Line heights ───────────────────────────────────────────────────────── */
+  --lh-display: 1.05;
+  --lh-heading: 1.15;
+  --lh-body: 1.5;
+  --lh-tight: 1.2;
+
+  /* ── Letter spacing ─────────────────────────────────────────────────────── */
+  --ls-display: -0.02em;
+  --ls-heading: -0.01em;
+  --ls-normal: normal;
+  --ls-label: 0.08em;
+  --ls-brand: 0.18em;
+
+  /* ── Composed role tokens (shorthand: weight size/line-height family) ────── */
+  --type-display: var(--fw-black) var(--fs-display)/var(--lh-display) var(--font-family);
+  --type-title: var(--fw-bold) var(--fs-title)/var(--lh-heading) var(--font-family);
+  --type-headline: var(--fw-bold) var(--fs-headline)/var(--lh-heading) var(--font-family);
+  --type-body: var(--fw-medium) var(--fs-body)/var(--lh-body) var(--font-family);
+  --type-label: var(--fw-semibold) var(--fs-label)/var(--lh-tight) var(--font-family);
+}

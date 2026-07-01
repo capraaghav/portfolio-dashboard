@@ -1,0 +1,24 @@
+/* ============================================================================
+   RADIUS + ELEVATION — consistently rounded, and flat by design.
+   "The Tonal-Depth Rule": separation between surfaces is a half-step lighter
+   surface + a hairline border, NEVER a box-shadow. A drop shadow under a card
+   here is a bug, not a style. The only glow is the gold accent and click-spark.
+   Radius values from docs/design-system.md.
+   ============================================================================ */
+:root {
+  --radius-sm: 8px;    /* tabs, chips, small controls */
+  --radius-md: 10px;   /* buttons, nav items */
+  --radius-lg: 12px;   /* dataframe / table wrapper */
+  --radius-xl: 14px;   /* metric cards */
+  --radius-2xl: 16px;  /* container cards — the larger wrapper */
+  --radius-pill: 999px;
+
+  /* Elevation is tonal, not cast. These are the ONLY sanctioned "shadows":
+     the gold focus ring, and a whisper-soft ring for keyboard focus. There is
+     deliberately no --shadow-card / --shadow-lg token. */
+  --elevation-flat: none;
+  --ring-focus: var(--focus-ring);
+
+  --transition-fast: 0.15s;
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1); /* ease-out, no overshoot */
+}
