@@ -29,4 +29,4 @@ four reader needs.
 
 ---
 
-See also the top-level [README](../README.md), [product/](../product/), [design system](design-system.md), [setup](howto-setup.md).
+See also the top-level [README](../README.md), [product/](../product/), [design system](design-system.md) (+ [CSS tokens](design-system/styles.css)), [setup](howto-setup.md).

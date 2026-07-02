@@ -112,6 +112,12 @@ components:
 
 # Design System: Portfolio Dashboard — Indian Markets
 
+> **CSS tokens:** the values in this spec are also available as CSS custom
+> properties under [`design-system/`](design-system/styles.css) — link
+> `styles.css` (it `@import`s `tokens/` for colors, typography, spacing, radius,
+> fonts) when prototyping or building static pages. For the app itself,
+> `formatting.py` remains the single source of truth.
+
 ## 1. Overview
 
 **Creative North Star: "The After-Hours Desk"**
