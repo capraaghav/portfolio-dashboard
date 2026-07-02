@@ -39,7 +39,7 @@
   /* ── Composed role tokens (shorthand: weight size/line-height family) ────── */
   --type-display: var(--fw-black) var(--fs-display)/var(--lh-display) var(--font-family);
   --type-title: var(--fw-bold) var(--fs-title)/var(--lh-heading) var(--font-family);
-  --type-headline: var(--fw-bold) var(--fs-headline)/var(--lh-heading) var(--font-family);
+  --type-headline: var(--fw-bold) var(--fs-headline)/var(--lh-tight) var(--font-family);
   --type-body: var(--fw-medium) var(--fs-body)/var(--lh-body) var(--font-family);
   --type-label: var(--fw-semibold) var(--fs-label)/var(--lh-tight) var(--font-family);
 }
